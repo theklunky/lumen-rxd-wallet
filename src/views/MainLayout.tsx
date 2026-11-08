@@ -7,6 +7,7 @@ import {
   ErrorNote,
   GearIcon,
   HomeIcon,
+  KeyIcon,
   LockIcon,
   RadiantMark,
   RefreshIcon,
@@ -15,12 +16,14 @@ import {
 import { OverviewView } from "./OverviewView";
 import { HistoryView } from "./HistoryView";
 import { TokensView } from "./TokensView";
+import { AddressesView } from "./AddressesView";
 import { SettingsView } from "./SettingsView";
 
 const TABS: { id: Tab; label: string; icon: (p: { size?: number; className?: string }) => JSX.Element }[] = [
   { id: "overview", label: "Overview", icon: HomeIcon },
   { id: "history", label: "History", icon: ClockIcon },
   { id: "tokens", label: "Tokens", icon: BoxIcon },
+  { id: "addresses", label: "Addresses", icon: KeyIcon },
   { id: "settings", label: "Settings", icon: GearIcon },
 ];
 
@@ -132,6 +135,7 @@ export function MainLayout() {
           {tab === "overview" && <OverviewView />}
           {tab === "history" && <HistoryView />}
           {tab === "tokens" && <TokensView />}
+          {tab === "addresses" && <AddressesView />}
           {tab === "settings" && <SettingsView />}
         </div>
       </main>

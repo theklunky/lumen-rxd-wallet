@@ -38,7 +38,7 @@ import {
 } from "../lib/walletService";
 
 export type Phase = "loading" | "setup" | "unlock" | "ready";
-export type Tab = "overview" | "history" | "tokens" | "settings";
+export type Tab = "overview" | "history" | "tokens" | "addresses" | "settings";
 
 interface AppApi {
   phase: Phase;
@@ -50,6 +50,8 @@ interface AppApi {
   clearError: () => void;
   /** The receive address currently on display (null while locked). */
   currentAddress: { address: string; path: string; index: number } | null;
+  /** All derived receive addresses, index 0..receiveIndex. */
+  addresses: { address: string; path: string; index: number }[] | null;
 
   createWallet: (mnemonic: string, password: string, coinType: number) => Promise<void>;
   unlock: (password: string) => Promise<void>;
@@ -343,6 +345,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       error,
       clearError,
       currentAddress: serviceRef.current?.currentAddress ?? null,
+      addresses:
+        serviceRef.current?.addresses.map(({ index, path, address }) => ({
+          index,
+          path,
+          address,
+        })) ?? null,
       createWallet,
       unlock,
       lock,
