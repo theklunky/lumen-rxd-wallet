@@ -13,6 +13,12 @@ import { mkdir } from "node:fs/promises";
 
 await mkdir("src-tauri/icons", { recursive: true });
 const SIZE = 1024;
+// The Radiant/Photonic reference icon draws its artwork at ~78% of the
+// canvas (56 px margin on a 512 px tile). Match that: a full-bleed tile
+// renders noticeably oversized in the Dock and app switcher.
+const ART = 800; // 78.125% of the canvas, same ratio as the reference
+const OFF = (SIZE - ART) / 2; // 112 px margin
+const RX = 180; // ~22.4% of the artwork, same corner ratio as before
 
 // 1) Extract the R glyph as a clean alpha mask.
 // radiant-mark.png is the favicon mark: black R on an opaque white circle,
@@ -59,8 +65,8 @@ function a_255_minus_l(l) {
   return Math.max(0, Math.min(255, Math.round(255 - l)));
 }
 
-// 2) Scale the glyph to 52% of the canvas height and center it.
-const glyphH = Math.round(SIZE * 0.52);
+// 2) Scale the glyph to 52% of the artwork height and center it.
+const glyphH = Math.round(ART * 0.52);
 const glyphW = Math.round((glyphH * cropW) / cropH);
 
 async function tintedAt(w, h) {
@@ -84,7 +90,8 @@ async function tintedAt(w, h) {
 const tinted = await tintedAt(glyphW, glyphH);
 const glyph = tinted;
 
-// 4) Background: site dark navy gradient, rounded corners, subtle glow + border.
+// 4) Background: site dark navy gradient, rounded corners, subtle glow +
+// border — drawn as a centered tile with the reference icon's margins.
 const bg = `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -96,9 +103,9 @@ const bg = `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SI
       <stop offset="1" stop-color="#38bdf8" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect width="${SIZE}" height="${SIZE}" rx="230" fill="url(#bg)"/>
-  <rect width="${SIZE}" height="${SIZE}" rx="230" fill="url(#glow)"/>
-  <rect x="5" y="5" width="${SIZE - 10}" height="${SIZE - 10}" rx="225" fill="none" stroke="#2a3a4d" stroke-width="6" opacity="0.7"/>
+  <rect x="${OFF}" y="${OFF}" width="${ART}" height="${ART}" rx="${RX}" fill="url(#bg)"/>
+  <rect x="${OFF}" y="${OFF}" width="${ART}" height="${ART}" rx="${RX}" fill="url(#glow)"/>
+  <rect x="${OFF + 5}" y="${OFF + 5}" width="${ART - 10}" height="${ART - 10}" rx="${RX - 5}" fill="none" stroke="#2a3a4d" stroke-width="6" opacity="0.7"/>
 </svg>`;
 
 const canvas = await sharp(Buffer.from(bg)).composite([
