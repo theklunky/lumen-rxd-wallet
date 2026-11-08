@@ -2,8 +2,10 @@
  * Password policy, aligned with NIST SP 800-63B §5.1.1 ("Memorized Secret
  * Verifiers").
  *
- *  - Minimum length of 8 characters is *required*; up to 1024 are accepted
- *    (NIST requires at least 64) and nothing is ever truncated.
+ *  - Minimum length of 12 characters is required — above the 8-character NIST
+ *    800-63B floor and in line with the 15-character direction of 800-63-4 for
+ *    single-factor secrets. Up to 1024 characters are accepted (NIST requires
+ *    at least 64) and nothing is ever truncated.
  *  - No composition rules: no forced uppercase/digits/symbols — length and
  *    unpredictability are what matter.
  *  - New passwords are compared against a blocklist of commonly used /
@@ -16,10 +18,10 @@
  * Rate limiting of failed unlock attempts (§5.1.1.2) lives in the unlock view.
  */
 
-/** Hard minimum (NIST 800-63B §5.1.1 requires at least 8). */
-export const MIN_PASSWORD_LENGTH = 8;
-/** Advisory minimum shown in the UI (NIST 800-63-4 moves single-factor secrets to 15). */
-export const RECOMMENDED_PASSWORD_LENGTH = 12;
+/** Hard minimum — stricter than the 8 characters NIST 800-63B requires. */
+export const MIN_PASSWORD_LENGTH = 12;
+/** Advisory minimum shown in the UI. */
+export const RECOMMENDED_PASSWORD_LENGTH = 16;
 /** Generous ceiling; well above the 64 characters NIST requires us to accept. */
 export const MAX_PASSWORD_LENGTH = 1024;
 
@@ -89,6 +91,42 @@ function isRepeatedCharacter(password: string): boolean {
   return /^(.)\1+$/su.test(password);
 }
 
+/** Repeating block, e.g. "abcabcabc" or "12341234". */
+function isRepeatedPattern(password: string): boolean {
+  return /^(.{1,8}?)\1+$/su.test(password);
+}
+
+/** All-digit passwords containing a run of 6+ consecutive digits. */
+function hasLongSequentialRun(password: string): boolean {
+  if (!/^[0-9]+$/.test(password)) return false;
+  let run = 1;
+  for (let i = 1; i < password.length; i++) {
+    const delta = password.charCodeAt(i) - password.charCodeAt(i - 1);
+    run = delta === 1 || delta === -1 ? run + 1 : 1;
+    if (run >= 6) return true;
+  }
+  return false;
+}
+
+/** Contains a 6+ character keyboard-row walk, e.g. "qwertyuiopas". */
+function containsKeyboardRun(password: string, min = 6): boolean {
+  const value = password.toLowerCase();
+  if (value.length < min) return false;
+  for (let i = 0; i + min <= value.length; i++) {
+    const window = value.slice(i, i + min);
+    for (const row of KEYBOARD_ROWS) {
+      if (row.includes(window) || [...row].reverse().join("").includes(window)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function isListedSecret(value: string): boolean {
+  return COMMON_PASSWORDS.includes(value) || CONTEXT_WORDS.includes(value);
+}
+
 function isSimpleSequence(password: string): boolean {
   const value = password.toLowerCase();
   if (value.length < 4) return false;
@@ -125,7 +163,14 @@ export function assessPassword(password: string): PasswordAssessment {
   }
 
   if (password.length > 0) {
-    if (COMMON_PASSWORDS.includes(normalized) || CONTEXT_WORDS.includes(normalized)) {
+    // Match the blocklist exactly, and also with trailing digits/punctuation
+    // stripped ("password12345" -> "password"), which NIST calls out as the
+    // "derivatives" a blocklist should cover.
+    const stripped = normalized.replace(
+      /^[\s!@#$%^&*()_+\-=.?,;:'"`~\\/|<>[\]{}]+|[\s!@#$%^&*()_+\-=.?,;:'"`~\\/|<>[\]{}\d]+$/gu,
+      "",
+    );
+    if (isListedSecret(normalized) || (stripped.length >= 3 && isListedSecret(stripped))) {
       problems.push(
         "That password is on the list of commonly used or breached passwords — choose something unique.",
       );
@@ -133,7 +178,14 @@ export function assessPassword(password: string): PasswordAssessment {
     if (isRepeatedCharacter(password)) {
       problems.push("Avoid repeating one character — use a longer, more varied password.");
     }
-    if (isSimpleSequence(password)) {
+    if (isRepeatedPattern(password)) {
+      problems.push("Avoid repeating a short pattern — use a longer, more varied password.");
+    }
+    if (
+      isSimpleSequence(password) ||
+      hasLongSequentialRun(password) ||
+      containsKeyboardRun(password)
+    ) {
       problems.push("Avoid simple sequences or keyboard patterns (e.g. 12345678, qwerty).");
     }
     if (length < RECOMMENDED_PASSWORD_LENGTH) {

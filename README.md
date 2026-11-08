@@ -22,9 +22,10 @@ down with a strict CSP.
   derived address, its balance, transaction count and derivation path
 - Password-protected vault: PBKDF2-SHA256 (600,000 iterations) → AES-256-GCM,
   stored locally; auto-lock after a configurable idle period
-- Password policy follows **NIST SP 800-63B**: ≥8 characters, no forced
-  character classes, blocked common/breached/pattern passwords, and
-  rate-limited unlock attempts — with a reveal toggle and guidance in the UI
+- Password policy follows **NIST SP 800-63B**: ≥12 characters (above the
+  8-character NIST floor), no forced character classes, blocked
+  common/breached/pattern passwords, and rate-limited unlock attempts — with
+  a reveal toggle and guidance in the UI
 - Reveal recovery phrase (password-gated), change password, erase wallet
 
 **Sending & receiving**
@@ -205,7 +206,7 @@ UI path can bypass it:
 
 | NIST requirement | Implementation |
 |---|---|
-| ≥8 characters required | `MIN_PASSWORD_LENGTH = 8`; 12+ recommended in the UI |
+| ≥12 characters required (NIST floor is 8) | `MIN_PASSWORD_LENGTH = 12`; 16+ recommended in the UI |
 | Accept ≥64 characters, never truncate | up to 1024 characters, counted in code points (Unicode/emoji safe) |
 | No composition rules | none enforced — guidance only |
 | Blocklist of common/breached/expected secrets | ~90 entry local list + app/coin vocabulary, repeated characters, simple sequences & keyboard walks |
