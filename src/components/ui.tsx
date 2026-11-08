@@ -1,5 +1,5 @@
 /** Shared UI primitives: buttons, fields, modal, icons, copy-to-clipboard. */
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import radiantMarkUrl from "../assets/radiant-mark.png";
 
 // ---- Icons (inline, 1.7px stroke, currentColor) -----------------------------
@@ -69,6 +69,10 @@ export const KeyIcon = ({ size = 18, className }: IconProps) =>
   svg(size, className, <><circle cx="8" cy="14" r="4.5" /><path d="m11.5 10.5 8-8M17 4l3 3m-5 0 2.5 2.5" /></>);
 export const ExternalIcon = ({ size = 14, className }: IconProps) =>
   svg(size, className, <path d="M14 4h6v6M20 4 11 13M9 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3" />);
+export const EyeIcon = ({ size = 16, className }: IconProps) =>
+  svg(size, className, <><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></>);
+export const EyeOffIcon = ({ size = 16, className }: IconProps) =>
+  svg(size, className, <><path d="M10.6 6.1A9.9 9.9 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.3 7.9A17 17 0 0 0 2 12s3.6 6 10 6a10 10 0 0 0 4-.8" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" /></>);
 
 // ---- Primitives --------------------------------------------------------------
 
@@ -146,6 +150,65 @@ export function Field({
 
 export const inputCls =
   "w-full rounded-lg border border-line bg-panel px-3 py-2 text-[14px] text-text placeholder:text-faint outline-none focus:border-accent/60 focus:ring-2 focus:ring-accent/15";
+
+/**
+ * Password input with a show/hide toggle inside the field.
+ * Used wherever a password is *created* — the requirement itself is
+ * explained by the calling view (see SetupView / SettingsView).
+ */
+export function PasswordField({
+  label,
+  value,
+  onChange,
+  hint,
+  autoFocus,
+  autoComplete = "off",
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  hint?: string;
+  autoFocus?: boolean;
+  autoComplete?: string;
+  placeholder?: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  const id = useId();
+  return (
+    <div>
+      <div className="mb-1.5 flex items-baseline justify-between">
+        <label htmlFor={id} className="text-[13px] font-medium text-muted">
+          {label}
+        </label>
+        {hint && <span className="text-[11px] text-faint">{hint}</span>}
+      </div>
+      <div className="relative">
+        <input
+          id={id}
+          type={visible ? "text" : "password"}
+          className={`${inputCls} pr-10`}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          autoFocus={autoFocus}
+          autoComplete={autoComplete}
+          spellCheck={false}
+        />
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          title={visible ? "Hide password" : "Show password"}
+          aria-label={visible ? "Hide password" : "Show password"}
+          aria-pressed={visible}
+          className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-lg text-muted transition-colors hover:text-text"
+        >
+          {visible ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function Modal({
   title,

@@ -10,8 +10,8 @@ import {
   CheckIcon,
   CopyButton,
   ErrorNote,
-  Field,
   inputCls,
+  PasswordField,
   RadiantMark,
   ShieldIcon,
 } from "../components/ui";
@@ -92,8 +92,19 @@ function PasswordStep({
   const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
-    setBusy(true);
     setError(null);
+    // Validate on submit so the requirement is spelled out when unmet.
+    if (pw1.length < MIN_PASSWORD_LENGTH) {
+      setError(
+        `Password must be at least ${MIN_PASSWORD_LENGTH} characters — yours is ${pw1.length}.`,
+      );
+      return;
+    }
+    if (pw1 !== pw2) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setBusy(true);
     try {
       await createWallet(mnemonic, pw1, coinType);
       onDone();
@@ -109,35 +120,51 @@ function PasswordStep({
         Choose a password to protect your wallet on this Mac. It encrypts the
         recovery phrase locally — nothing is sent anywhere.
       </p>
-      <Field label="Password" hint={`min ${MIN_PASSWORD_LENGTH} characters`}>
-        <input
-          type="password"
-          className={inputCls}
-          value={pw1}
-          onChange={(e) => setPw1(e.target.value)}
-          autoFocus
-          autoComplete="new-password"
-        />
-      </Field>
-      <Field label="Confirm password">
-        <input
-          type="password"
-          className={inputCls}
-          value={pw2}
-          onChange={(e) => setPw2(e.target.value)}
-          autoComplete="new-password"
-        />
-      </Field>
+      <PasswordField
+        label="Password"
+        value={pw1}
+        onChange={setPw1}
+        autoFocus
+        autoComplete="new-password"
+        hint={
+          pw1.length >= MIN_PASSWORD_LENGTH
+            ? "✓ requirement met"
+            : `${pw1.length}/${MIN_PASSWORD_LENGTH}`
+        }
+      />
+      <PasswordField
+        label="Confirm password"
+        value={pw2}
+        onChange={setPw2}
+        autoComplete="new-password"
+        hint={pw2 && pw1 !== pw2 ? "does not match" : undefined}
+      />
+      <div className="rounded-lg border border-line bg-panel px-3 py-2">
+        <p className="text-[12px] font-medium text-text">
+          Password requirements
+        </p>
+        <ul className="mt-1 space-y-0.5 text-[12px] leading-relaxed text-muted">
+          <li
+            className={
+              pw1.length >= MIN_PASSWORD_LENGTH ? "text-good" : undefined
+            }
+          >
+            • At least {MIN_PASSWORD_LENGTH} characters
+            {pw1.length >= MIN_PASSWORD_LENGTH ? " ✓" : ` (${pw1.length} so far)`}
+          </li>
+          <li>• Longer passphrases are stronger — a short sentence works well</li>
+          <li>
+            • There is no password reset: if you forget it, your 12-word
+            recovery phrase is the only way back in
+          </li>
+        </ul>
+      </div>
       {error && <ErrorNote text={error} />}
       <div className="flex justify-between pt-1">
         <Button variant="ghost" onClick={onBack}>
           Back
         </Button>
-        <Button
-          onClick={submit}
-          busy={busy}
-          disabled={pw1.length < MIN_PASSWORD_LENGTH || pw1 !== pw2}
-        >
+        <Button onClick={submit} busy={busy}>
           <ShieldIcon />
           Create wallet
         </Button>

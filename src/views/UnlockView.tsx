@@ -2,7 +2,6 @@
 import { useState, type FormEvent } from "react";
 import { useApp, friendly } from "../state/AppContext";
 import { Button, ErrorNote, Field, inputCls, RadiantMark, ShieldIcon } from "../components/ui";
-import { MIN_PASSWORD_LENGTH } from "../lib/crypto";
 
 export function UnlockView() {
   const { unlock, erase } = useApp();
@@ -90,9 +89,6 @@ export function UnlockView() {
             </div>
           )}
         </div>
-        <p className="mt-4 text-center text-[11px] text-faint">
-          Minimum password length: {MIN_PASSWORD_LENGTH} characters
-        </p>
       </div>
     </div>
   );

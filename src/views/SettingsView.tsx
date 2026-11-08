@@ -12,6 +12,7 @@ import {
   inputCls,
   KeyIcon,
   Modal,
+  PasswordField,
   RadiantMark,
   ShieldIcon,
   ExternalIcon,
@@ -316,10 +317,23 @@ function ChangePwModal({
   const [ok, setOk] = useState(false);
 
   const go = async () => {
-    setBusy(true);
     setError(null);
+    if (!oldPw) {
+      setError("Enter your current password.");
+      return;
+    }
+    if (newPw.length < MIN_PASSWORD_LENGTH) {
+      setError(
+        `New password must be at least ${MIN_PASSWORD_LENGTH} characters — yours is ${newPw.length}.`,
+      );
+      return;
+    }
+    if (newPw !== newPw2) {
+      setError("New passwords do not match.");
+      return;
+    }
+    setBusy(true);
     try {
-      if (newPw !== newPw2) throw new Error("New passwords do not match");
       await onChange(oldPw, newPw);
       setOk(true);
     } catch (e) {
@@ -340,44 +354,46 @@ function ChangePwModal({
         </div>
       ) : (
         <div className="space-y-4">
-          <Field label="Current password">
-            <input
-              type="password"
-              className={inputCls}
-              value={oldPw}
-              onChange={(e) => setOldPw(e.target.value)}
-              autoFocus
-              autoComplete="off"
-            />
-          </Field>
-          <Field label="New password" hint={`min ${MIN_PASSWORD_LENGTH} characters`}>
-            <input
-              type="password"
-              className={inputCls}
-              value={newPw}
-              onChange={(e) => setNewPw(e.target.value)}
-              autoComplete="new-password"
-            />
-          </Field>
-          <Field label="Confirm new password">
-            <input
-              type="password"
-              className={inputCls}
-              value={newPw2}
-              onChange={(e) => setNewPw2(e.target.value)}
-              autoComplete="new-password"
-            />
-          </Field>
+          <PasswordField
+            label="Current password"
+            value={oldPw}
+            onChange={setOldPw}
+            autoFocus
+          />
+          <PasswordField
+            label="New password"
+            value={newPw}
+            onChange={setNewPw}
+            autoComplete="new-password"
+            hint={
+              newPw.length >= MIN_PASSWORD_LENGTH
+                ? "✓ requirement met"
+                : `${newPw.length}/${MIN_PASSWORD_LENGTH}`
+            }
+          />
+          <PasswordField
+            label="Confirm new password"
+            value={newPw2}
+            onChange={setNewPw2}
+            autoComplete="new-password"
+            hint={newPw2 && newPw !== newPw2 ? "does not match" : undefined}
+          />
+          <p className="text-[12px] leading-relaxed text-muted">
+            New password must be at least {MIN_PASSWORD_LENGTH} characters
+            {newPw.length >= MIN_PASSWORD_LENGTH ? (
+              <span className="text-good"> ✓</span>
+            ) : (
+              ` (${newPw.length} so far)`
+            )}{" "}
+            — longer passphrases are stronger, and there is no reset if you
+            forget it.
+          </p>
           {error && <ErrorNote text={error} />}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose} disabled={busy}>
               Cancel
             </Button>
-            <Button
-              onClick={go}
-              busy={busy}
-              disabled={!oldPw || newPw.length < MIN_PASSWORD_LENGTH || newPw !== newPw2}
-            >
+            <Button onClick={go} busy={busy}>
               Save
             </Button>
           </div>
