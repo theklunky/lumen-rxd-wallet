@@ -8,9 +8,9 @@ import {
   GearIcon,
   HomeIcon,
   LockIcon,
+  RadiantMark,
   RefreshIcon,
   Spinner,
-  SunIcon,
 } from "../components/ui";
 import { OverviewView } from "./OverviewView";
 import { HistoryView } from "./HistoryView";
@@ -35,11 +35,11 @@ export function MainLayout() {
         {/* macOS traffic-light drag strip */}
         <div className="drag-strip flex h-[52px] items-end pb-2">
           <div className="ml-[68px] flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent2 text-[#1a1205]">
-              <SunIcon size={17} />
+            <span className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-lg border border-line bg-card2">
+              <RadiantMark size={22} />
             </span>
             <div className="leading-tight">
-              <div className="text-[13px] font-semibold">Radiant</div>
+              <div className="text-[13px] font-semibold">Lumen</div>
               <div className="text-[10px] text-faint">RXD wallet</div>
             </div>
           </div>

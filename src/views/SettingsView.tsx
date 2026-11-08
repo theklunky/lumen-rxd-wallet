@@ -12,8 +12,8 @@ import {
   inputCls,
   KeyIcon,
   Modal,
+  RadiantMark,
   ShieldIcon,
-  SunIcon,
   ExternalIcon,
 } from "../components/ui";
 import { openExternal } from "../lib/explorer";
@@ -120,8 +120,8 @@ export function SettingsView() {
       <section className="rounded-2xl border border-line bg-card p-5">
         <h2 className="mb-3 text-[14px] font-semibold">About</h2>
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent2 text-[#1a1205]">
-            <SunIcon size={22} />
+          <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-line bg-card2">
+            <RadiantMark size={30} />
           </span>
           <div>
             <div className="text-[13.5px] font-semibold">Lumen Wallet 0.1.0</div>

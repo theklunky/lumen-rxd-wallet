@@ -1,5 +1,6 @@
 /** Shared UI primitives: buttons, fields, modal, icons, copy-to-clipboard. */
 import { useEffect, useState, type ReactNode } from "react";
+import radiantMarkUrl from "../assets/radiant-mark.png";
 
 // ---- Icons (inline, 1.7px stroke, currentColor) -----------------------------
 
@@ -21,13 +22,19 @@ const svg = (size: number, className: string | undefined, children: ReactNode) =
   </svg>
 );
 
-export const SunIcon = ({ size = 20, className }: IconProps) =>
-  svg(size, className, (
-    <>
-      <circle cx="12" cy="12" r="4.2" fill="currentColor" stroke="none" />
-      <path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5 5l1.9 1.9M17.1 17.1 19 19M19 5l-1.9 1.9M6.9 17.1 5 19" />
-    </>
-  ));
+// Official Radiant "R" brand mark (sky gradient on transparent, from
+// radiantcore.org — regenerate with `npm run icons`).
+export const RadiantMark = ({ size = 20, className }: IconProps) => (
+  <img
+    src={radiantMarkUrl}
+    width={size}
+    height={size}
+    className={className}
+    alt=""
+    aria-hidden
+    draggable={false}
+  />
+);
 export const HomeIcon = ({ size = 18, className }: IconProps) =>
   svg(size, className, <path d="M3.5 10.5 12 3.5l8.5 7v9.5a1 1 0 0 1-1 1h-5v-6h-5v6h-5a1 1 0 0 1-1-1z" />);
 export const ClockIcon = ({ size = 18, className }: IconProps) =>

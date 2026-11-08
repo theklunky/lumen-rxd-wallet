@@ -62,13 +62,13 @@ function a_255_minus_l(l) {
 // 2) Scale the glyph to 52% of the canvas height and center it.
 const glyphH = Math.round(SIZE * 0.52);
 const glyphW = Math.round((glyphH * cropW) / cropH);
-const tinted = await sharp(mask, { raw: { width: cropW, height: cropH, channels: 4 } })
-  .resize(glyphW, glyphH, { kernel: "lanczos3" })
-  .png()
-  .toBuffer();
 
-// 3) Tint the mask with the site's sky gradient (#7dd3fc -> #38bdf8 -> #0ea5e9).
-const sky = `<svg xmlns="http://www.w3.org/2000/svg" width="${glyphW}" height="${glyphH}">
+async function tintedAt(w, h) {
+  const resized = await sharp(mask, { raw: { width: cropW, height: cropH, channels: 4 } })
+    .resize(w, h, { kernel: "lanczos3" })
+    .png()
+    .toBuffer();
+  const sky = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
   <defs>
     <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#7dd3fc"/>
@@ -76,12 +76,13 @@ const sky = `<svg xmlns="http://www.w3.org/2000/svg" width="${glyphW}" height="$
       <stop offset="1" stop-color="#0ea5e9"/>
     </linearGradient>
   </defs>
-  <rect width="${glyphW}" height="${glyphH}" fill="url(#sky)"/>
+  <rect width="${w}" height="${h}" fill="url(#sky)"/>
 </svg>`;
-const glyph = await sharp(Buffer.from(sky))
-  .composite([{ input: tinted, blend: "dest-in" }])
-  .png()
-  .toBuffer();
+  return sharp(Buffer.from(sky)).composite([{ input: resized, blend: "dest-in" }]).png().toBuffer();
+}
+
+const tinted = await tintedAt(glyphW, glyphH);
+const glyph = tinted;
 
 // 4) Background: site dark navy gradient, rounded corners, subtle glow + border.
 const bg = `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">
@@ -105,6 +106,20 @@ const canvas = await sharp(Buffer.from(bg)).composite([
 ]);
 await canvas.png().toFile("src-tauri/icons/source.png");
 console.log("source.png written (1024x1024)");
+
+// Also export the sky-tinted R on a transparent background for the in-app UI.
+await mkdir("src/assets", { recursive: true });
+const ASSET = 512;
+const fit = Math.round(ASSET * 0.8);
+const fitW = Math.round((fit * cropW) / cropH);
+const uiMark = await tintedAt(fitW, fit);
+await sharp({
+  create: { width: ASSET, height: ASSET, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+})
+  .composite([{ input: uiMark, gravity: "center" }])
+  .png()
+  .toFile("src/assets/radiant-mark.png");
+console.log("src/assets/radiant-mark.png written (512x512, transparent)");
 
 execSync("npx tauri icon src-tauri/icons/source.png", { stdio: "inherit" });
 console.log("icon set generated");

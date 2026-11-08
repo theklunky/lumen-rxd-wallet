@@ -12,8 +12,8 @@ import {
   ErrorNote,
   Field,
   inputCls,
+  RadiantMark,
   ShieldIcon,
-  SunIcon,
 } from "../components/ui";
 import { MIN_PASSWORD_LENGTH } from "../lib/crypto";
 
@@ -26,8 +26,8 @@ export function SetupView() {
     <div className="flex h-full items-center justify-center p-8">
       <div className="w-full max-w-[520px]">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-accent to-accent2 text-[#1a1205] shadow-[0_4px_24px_-4px_rgba(249,115,22,0.5)]">
-            <SunIcon size={30} />
+          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-line bg-card2 shadow-[0_4px_24px_-4px_rgba(56,189,248,0.45)]">
+            <RadiantMark size={46} />
           </div>
           <h1 className="text-lg font-semibold">Lumen Wallet</h1>
           <p className="text-[13px] text-muted">
