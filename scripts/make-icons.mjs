@@ -123,3 +123,34 @@ console.log("src/assets/radiant-mark.png written (512x512, transparent)");
 
 execSync("npx tauri icon src-tauri/icons/source.png", { stdio: "inherit" });
 console.log("icon set generated");
+
+// 5) Apple-recommended .icns: rebuild it from the full macOS icon set
+// (16 .. 512@2x = 1024 px). The icns the Tauri CLI writes lacks the
+// intermediate representations, so macOS cannot render the icon crisply
+// at every Dock/Finder size. iconutil is macOS-only; elsewhere the
+// Tauri-generated icns is kept (it is unused by those bundles).
+if (process.platform === "darwin") {
+  const iconset = "src-tauri/icons/AppIcon.iconset";
+  execSync(`rm -rf "${iconset}" && mkdir -p "${iconset}"`);
+  const representations = [
+    ["16x16", 16],
+    ["16x16@2x", 32],
+    ["32x32", 32],
+    ["32x32@2x", 64],
+    ["128x128", 128],
+    ["128x128@2x", 256],
+    ["256x256", 256],
+    ["256x256@2x", 512],
+    ["512x512", 512],
+    ["512x512@2x", 1024],
+  ];
+  for (const [name, px] of representations) {
+    await sharp("src-tauri/icons/source.png")
+      .resize(px, px, { kernel: "lanczos3" })
+      .png()
+      .toFile(`${iconset}/icon_${name}.png`);
+  }
+  execSync(`iconutil -c icns "${iconset}" -o src-tauri/icons/icon.icns`);
+  execSync(`rm -rf "${iconset}"`);
+  console.log("icon.icns rebuilt with the full Apple icon set (16..1024)");
+}
