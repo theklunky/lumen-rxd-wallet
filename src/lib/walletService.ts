@@ -90,11 +90,14 @@ export interface ScanResult {
 const FETCH_CONCURRENCY = 8;
 const RESCAN_DEBOUNCE_MS = 2000;
 
-/** Verbose ElectrumX transaction shape (standard block-explorer format). */
+/** Verbose ElectrumX transaction shape (bitcoind-style getrawtransaction). */
 interface RawTx {
   txid?: string;
   hash?: string;
   time?: number;
+  blocktime?: number;
+  blockhash?: string;
+  confirmations?: number;
   fee?: number;
   block?: { height: number; timestamp?: number };
   vin?: {
@@ -169,7 +172,7 @@ export class WalletService {
     let unconfirmed = 0n;
     const utxos: TaggedUtxo[] = [];
     const perAddress: Record<string, PerAddress> = {};
-    const txMeta = new Map<string, { height: number; value: bigint }>(); // txid -> min height, net value
+    const txMeta = new Map<string, { height: number; credit: bigint; debit: bigint }>(); // txid -> min height, wallet credits/debits
 
     for (const r of per) {
       if (r.status !== "fulfilled") continue;
@@ -185,9 +188,11 @@ export class WalletService {
       };
       for (const h of hs) {
         const prev = txMeta.get(h.tx_hash);
+        const v = BigInt(h.value ?? 0);
         txMeta.set(h.tx_hash, {
           height: Math.min(prev?.height ?? h.height, h.height),
-          value: (prev?.value ?? 0n) + BigInt(h.value ?? 0),
+          credit: (prev?.credit ?? 0n) + (v > 0n ? v : 0n),
+          debit: (prev?.debit ?? 0n) + (v < 0n ? -v : 0n),
         });
       }
     }
@@ -203,7 +208,7 @@ export class WalletService {
   }
 
   private async fetchTxDetails(
-    entries: [string, { height: number; value: bigint }][],
+    entries: [string, { height: number; credit: bigint; debit: bigint }][],
     items: HistoryItem[],
     tokenCandidates: Map<string, TokenHolding>,
   ): Promise<void> {
@@ -220,13 +225,12 @@ export class WalletService {
             // confirmed tx may also be momentarily unfetchable. Synthesize
             // the row from the history entry so it is visible instead of
             // silently dropped.
-            const v = meta.value;
             items.push({
               txid,
               height: meta.height,
               time: 0,
-              received: v > 0n ? v : 0n,
-              sent: v < 0n ? -v : 0n,
+              received: meta.credit,
+              sent: meta.debit,
               fee: 0n,
               counterparty: null,
             });
@@ -362,7 +366,7 @@ export class WalletService {
         : totalIn > totalOut
           ? totalIn - totalOut
           : 0n;
-    const time = tx.block?.timestamp ?? tx.time ?? 0;
+    const time = tx.block?.timestamp ?? tx.blocktime ?? tx.time ?? 0;
     return { txid, height, time, received, sent, fee, counterparty };
   }
 

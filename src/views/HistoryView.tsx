@@ -63,8 +63,11 @@ export function HistoryRow({ item, network }: { item: HistoryItem; network: Netw
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <div className={`text-[13.5px] font-semibold ${delta >= 0n ? "text-good" : "text-text"}`}>
-          {fmtSignedRxd(delta)} RXD
+        <div
+          title={isIn || isOut ? undefined : "Amount moved between your own addresses"}
+          className={`text-[13.5px] font-semibold ${isIn ? "text-good" : "text-text"}`}
+        >
+          {isIn || isOut ? fmtSignedRxd(delta) : fmtRxd(item.received)} RXD
         </div>
         {item.fee > 0n && item.sent > 0n && (
           <div className="text-[11px] text-faint">incl. fee {fmtRxd(item.fee)} RXD</div>
