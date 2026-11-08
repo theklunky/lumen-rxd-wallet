@@ -1,0 +1,42 @@
+{
+  "name": "radiant-wallet",
+  "productName": "Radiant Wallet",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run typecheck && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "tauri": "tauri",
+    "icons": "node scripts/make-icons.mjs"
+  },
+  "dependencies": {
+    "@radiant-core/radiantjs": "^2.0.6",
+    "@radiant-core/sdk": "^0.2.1",
+    "@tauri-apps/api": "^2.5.0",
+    "@tauri-apps/plugin-opener": "^2.2.6",
+    "@tauri-apps/plugin-store": "^2.2.0",
+    "assert": "^2.1.0",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.1",
+    "events": "^3.3.0",
+    "qrcode.react": "^4.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "readable-stream": "^4.8.0",
+    "util": "^0.12.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.4",
+    "@tauri-apps/cli": "^2.5.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.5.0",
+    "sharp": "^0.34.2",
+    "tailwindcss": "^4.1.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}
