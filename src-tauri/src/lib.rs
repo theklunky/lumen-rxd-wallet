@@ -10,5 +10,5 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![app_version])
         .run(tauri::generate_context!())
-        .expect("error while running Lumen Wallet");
+        .expect("error while running Lumen RXD Wallet");
 }

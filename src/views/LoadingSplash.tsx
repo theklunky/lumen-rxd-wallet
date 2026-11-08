@@ -6,7 +6,7 @@ export function LoadingSplash() {
       <RadiantMark size={52} />
       <div className="flex items-center gap-2 text-[13px]">
         <Spinner />
-        Starting Lumen Wallet…
+        Starting Lumen RXD Wallet…
       </div>
     </div>
   );

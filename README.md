@@ -1,4 +1,4 @@
-# Lumen Wallet
+# Lumen RXD Wallet
 
 Non-custodial desktop wallet for the [Radiant](https://radiantcore.org)
 (RXD) blockchain. Built with **Tauri 2 + React/TypeScript**, backed by the

@@ -29,7 +29,7 @@ export function SetupView() {
           <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-line bg-card2 shadow-[0_4px_24px_-4px_rgba(56,189,248,0.45)]">
             <RadiantMark size={46} />
           </div>
-          <h1 className="text-lg font-semibold">Lumen Wallet</h1>
+          <h1 className="text-lg font-semibold">Lumen RXD Wallet</h1>
           <p className="text-[13px] text-muted">
             A non-custodial wallet for the Radiant (RXD) blockchain
           </p>

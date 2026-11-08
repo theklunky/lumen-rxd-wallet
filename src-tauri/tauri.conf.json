@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Lumen Wallet",
+  "productName": "Lumen RXD Wallet",
   "version": "0.1.0",
   "identifier": "org.lumenwallet.lumen-wallet",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Lumen Wallet",
+        "title": "Lumen RXD Wallet",
         "width": 1180,
         "height": 780,
         "minWidth": 960,
@@ -36,7 +36,7 @@
     ],
     "category": "Finance",
     "shortDescription": "Non-custodial wallet for the Radiant (RXD) blockchain",
-    "longDescription": "Lumen Wallet is a non-custodial desktop wallet for the Radiant (RXD) blockchain: HD wallets (m/44'/512'), live balances via ElectrumX, WAVE name resolution, and Glyph token support.",
+    "longDescription": "Lumen RXD Wallet is a non-custodial desktop wallet for the Radiant (RXD) blockchain: HD wallets (m/44'/512'), live balances via ElectrumX, WAVE name resolution, and Glyph token support.",
     "macOS": {
       "minimumSystemVersion": "11.0"
     }

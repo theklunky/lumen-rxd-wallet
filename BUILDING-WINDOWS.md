@@ -21,7 +21,7 @@ options are documented below.
    - `macos` job (macos-latest): builds the `.dmg` too
 4. When the run is green, open the run summary page and download the
    **`lumen-wallet-windows`** artifact. It contains:
-   - `Lumen Wallet 0.1.0 x64-setup.exe` — NSIS installer
+   - `Lumen RXD Wallet 0.1.0 x64-setup.exe` — NSIS installer
    - `lumen-wallet.exe` — portable single binary (runs from any folder)
 
 ## Option B — Local build on a Windows machine
@@ -68,7 +68,7 @@ The first build compiles ~400 crates and can take 10–20 minutes.
 
 | Artifact | Path |
 |---|---|
-| NSIS installer | `src-tauri\target\release\bundle\nsis\Lumen Wallet 0.1.0 x64-setup.exe` |
+| NSIS installer | `src-tauri\target\release\bundle\nsis\Lumen RXD Wallet 0.1.0 x64-setup.exe` |
 | MSI installer | `src-tauri\target\release\bundle\msi\*.msi` |
 | Portable binary | `src-tauri\target\release\lumen-wallet.exe` |
 

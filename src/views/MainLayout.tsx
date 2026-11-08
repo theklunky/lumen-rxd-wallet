@@ -42,8 +42,8 @@ export function MainLayout() {
               <RadiantMark size={22} />
             </span>
             <div className="leading-tight">
-              <div className="text-[13px] font-semibold">Lumen</div>
-              <div className="text-[10px] text-faint">RXD wallet</div>
+              <div className="text-[13px] font-semibold">Lumen RXD</div>
+              <div className="text-[10px] text-faint">Wallet</div>
             </div>
           </div>
         </div>

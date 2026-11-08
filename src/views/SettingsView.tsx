@@ -124,7 +124,7 @@ export function SettingsView() {
             <RadiantMark size={30} />
           </span>
           <div>
-            <div className="text-[13.5px] font-semibold">Lumen Wallet 0.1.0</div>
+            <div className="text-[13.5px] font-semibold">Lumen RXD Wallet 0.1.0</div>
             <div className="text-[12px] text-muted">
               Non-custodial wallet for the Radiant (RXD) blockchain · HD path m/44′/512′/0′/0/k
             </div>
