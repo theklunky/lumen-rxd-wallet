@@ -55,8 +55,15 @@ down with a strict CSP.
 |---|---|
 | Node.js | 20.19+ or 22+ (the SDK needs `require(ESM)` support) |
 | Rust | stable toolchain (`cargo`) |
-| macOS | 11+ (Xcode command line tools) |
+| macOS | **13.3 Ventura or newer** (see note below) |
 | Windows | 10/11 with the MSVC build tools + WebView2 runtime |
+
+> **Why macOS 13.3?** The UI is styled with Tailwind CSS v4, whose output uses
+> modern CSS (`@property`, `color-mix()`, `oklch()`) that requires WebKit 16.4
+> — first shipped with macOS 13.3. BigInt (ES2020, needed for photon amounts)
+> additionally rules out anything below macOS 11. The app's `Info.plist`
+> declares `LSMinimumSystemVersion 13.3` so older systems refuse to launch it
+> rather than render a broken interface.
 
 Platform prerequisites are documented at
 <https://tauri.app/start/prerequisites/>.
@@ -263,8 +270,8 @@ Radiant's ecosystem has a few sharp edges that this wallet handles explicitly:
 
 ## License
 
-No license file has been added to this repository yet. Before distributing
-builds or making the source public, add one — MIT is a natural fit given the
-Radiant SDK and reference wallets are MIT-licensed.
+MIT — see [LICENSE](./LICENSE).
+
+Copyright (c) 2026 Lumen RXD Wallet contributors.
 
 

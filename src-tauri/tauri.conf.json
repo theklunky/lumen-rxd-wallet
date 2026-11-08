@@ -38,7 +38,7 @@
     "shortDescription": "Non-custodial wallet for the Radiant (RXD) blockchain",
     "longDescription": "Lumen RXD Wallet is a non-custodial desktop wallet for the Radiant (RXD) blockchain: HD wallets (m/44'/512'), live balances via ElectrumX, WAVE name resolution, and Glyph token support.",
     "macOS": {
-      "minimumSystemVersion": "11.0"
+      "minimumSystemVersion": "13.3"
     }
   }
 }
