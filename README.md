@@ -1,8 +1,9 @@
-# Radiant Wallet
+# Lumen Wallet
 
 Non-custodial desktop wallet for the [Radiant](https://radiantcore.org)
 (RXD) blockchain. Built with **Tauri 2 + React/TypeScript**, backed by the
-official `@radiant-core/sdk`.
+official `@radiant-core/sdk`. Styled to match the Radiant ecosystem
+(radiantcore.org design tokens, official Radiant mark as the app icon).
 
 ## Features
 
@@ -26,6 +27,7 @@ npm install
 npm run tauri dev      # live-reload dev window
 npx tsc --noEmit       # type-check
 npm run build          # webview production bundle
+npm run icons          # regenerate the app icon set (official Radiant mark)
 ```
 
 ### macOS build

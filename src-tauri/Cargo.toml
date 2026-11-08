@@ -1,12 +1,12 @@
 [package]
-name = "radiant-wallet"
+name = "lumen-wallet"
 version = "0.1.0"
-description = "Radiant (RXD) wallet for macOS and Windows"
-authors = ["Radiant Wallet"]
+description = "Lumen Wallet — non-custodial Radiant (RXD) wallet for macOS and Windows"
+authors = ["Lumen Wallet"]
 edition = "2021"
 
 [lib]
-name = "radiant_wallet_lib"
+name = "lumen_wallet_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

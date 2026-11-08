@@ -11,7 +11,7 @@ options are documented below.
 2. From this folder:
 
    ```sh
-   git remote add origin git@github.com:YOUR_USER/radiant-wallet.git
+   git remote add origin git@github.com:YOUR_USER/lumen-wallet.git
    git push -u origin main
    ```
 
@@ -20,9 +20,9 @@ options are documented below.
    - `windows` job (windows-latest): Rust MSVC + Node 22 → `tauri build`
    - `macos` job (macos-latest): builds the `.dmg` too
 4. When the run is green, open the run summary page and download the
-   **`radiant-wallet-windows`** artifact. It contains:
-   - `Radiant Wallet 0.1.0 x64-setup.exe` — NSIS installer
-   - `radiant-wallet.exe` — portable single binary (runs from any folder)
+   **`lumen-wallet-windows`** artifact. It contains:
+   - `Lumen Wallet 0.1.0 x64-setup.exe` — NSIS installer
+   - `lumen-wallet.exe` — portable single binary (runs from any folder)
 
 ## Option B — Local build on a Windows machine
 
@@ -56,8 +56,8 @@ node -v         # v20+
 ### Build
 
 ```powershell
-git clone git@github.com:YOUR_USER/radiant-wallet.git
-cd radiant-wallet
+git clone git@github.com:YOUR_USER/lumen-wallet.git
+cd lumen-wallet
 npm install
 npm run tauri build
 ```
@@ -68,9 +68,9 @@ The first build compiles ~400 crates and can take 10–20 minutes.
 
 | Artifact | Path |
 |---|---|
-| NSIS installer | `src-tauri\target\release\bundle\nsis\Radiant Wallet 0.1.0 x64-setup.exe` |
+| NSIS installer | `src-tauri\target\release\bundle\nsis\Lumen Wallet 0.1.0 x64-setup.exe` |
 | MSI installer | `src-tauri\target\release\bundle\msi\*.msi` |
-| Portable binary | `src-tauri\target\release\radiant-wallet.exe` |
+| Portable binary | `src-tauri\target\release\lumen-wallet.exe` |
 
 ## Notes
 

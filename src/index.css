@@ -1,18 +1,23 @@
 @import "tailwindcss";
 
+/* Palette mirrored from radiantcore.org's site design tokens. */
 @theme {
-  --color-bg: #0a0c12;
-  --color-panel: #10131b;
-  --color-card: #151a24;
-  --color-card2: #1a2130;
-  --color-line: #242c3d;
-  --color-text: #e9edf5;
-  --color-muted: #8d97ad;
-  --color-faint: #5c6579;
-  --color-accent: #f6a821;
-  --color-accent2: #f97316;
+  --color-bg: #0a0e17;
+  --color-panel: #111827;
+  --color-card: #15202f;
+  --color-card2: #1a2332;
+  --color-line: #1e2d3d;
+  --color-line2: #2a3a4d;
+  --color-text: #e2e8f0;
+  --color-muted: #94a3b8;
+  --color-faint: #64748b;
+  --color-accent: #38bdf8;
+  --color-accent2: #0ea5e9;
+  --color-accent3: #7dd3fc;
   --color-good: #34d399;
+  --color-warn: #fb923c;
   --color-bad: #f87171;
+  --color-violet: #a78bfa;
 }
 
 html,
@@ -29,12 +34,12 @@ body {
 }
 
 ::selection {
-  background: rgba(246, 168, 33, 0.3);
+  background: rgba(56, 189, 248, 0.28);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2a3347 transparent;
+  scrollbar-color: #2a3a4d transparent;
 }
 
 /* Native-feeling macOS window drag strip */

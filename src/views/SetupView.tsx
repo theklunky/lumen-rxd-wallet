@@ -29,7 +29,7 @@ export function SetupView() {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-accent to-accent2 text-[#1a1205] shadow-[0_4px_24px_-4px_rgba(249,115,22,0.5)]">
             <SunIcon size={30} />
           </div>
-          <h1 className="text-lg font-semibold">Radiant Wallet</h1>
+          <h1 className="text-lg font-semibold">Lumen Wallet</h1>
           <p className="text-[13px] text-muted">
             A non-custodial wallet for the Radiant (RXD) blockchain
           </p>
@@ -193,7 +193,7 @@ function CreateFlow({ onBack }: { onBack: () => void }) {
           type="checkbox"
           checked={confirmed}
           onChange={(e) => setConfirmed(e.target.checked)}
-          className="mt-0.5 h-4 w-4 accent-[#f6a821]"
+          className="mt-0.5 h-4 w-4 accent-accent"
         />
         <span className="text-[13px] text-muted">
           I have written down my recovery phrase and understand that losing it
@@ -274,7 +274,7 @@ function RestoreFlow({ onBack }: { onBack: () => void }) {
           type="checkbox"
           checked={legacy}
           onChange={(e) => setLegacy(e.target.checked)}
-          className="mt-0.5 h-4 w-4 accent-[#f6a821]"
+          className="mt-0.5 h-4 w-4 accent-accent"
         />
         <span className="text-[12.5px] text-muted">
           <span className="text-text">Legacy wallet (coin type 0)</span> — only

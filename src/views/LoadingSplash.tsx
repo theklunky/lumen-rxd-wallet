@@ -8,7 +8,7 @@ export function LoadingSplash() {
       </div>
       <div className="flex items-center gap-2 text-[13px]">
         <Spinner />
-        Starting Radiant Wallet…
+        Starting Lumen Wallet…
       </div>
     </div>
   );

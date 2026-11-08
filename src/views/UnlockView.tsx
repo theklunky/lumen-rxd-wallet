@@ -42,7 +42,7 @@ export function UnlockView() {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-accent to-accent2 text-[#1a1205] shadow-[0_4px_24px_-4px_rgba(249,115,22,0.5)]">
             <SunIcon size={30} />
           </div>
-          <h1 className="text-lg font-semibold">Radiant Wallet</h1>
+          <h1 className="text-lg font-semibold">Lumen Wallet</h1>
           <p className="text-[13px] text-muted">Enter your password to unlock</p>
         </div>
 

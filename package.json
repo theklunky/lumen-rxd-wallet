@@ -1,6 +1,6 @@
 {
-  "name": "radiant-wallet",
-  "productName": "Radiant Wallet",
+  "name": "lumen-wallet",
+  "productName": "Lumen Wallet",
   "private": true,
   "version": "0.1.0",
   "type": "module",
