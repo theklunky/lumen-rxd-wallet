@@ -90,6 +90,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const serviceRef = useRef<WalletService | null>(null);
   const mnemonicRef = useRef<string | null>(null);
   const coinTypeRef = useRef<number>(512);
+  const probeDoneRef = useRef<boolean>(false);
   const settingsRef = useRef<Settings>(settings);
   settingsRef.current = settings;
   const lastActivityRef = useRef<number>(Date.now());
@@ -140,6 +141,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     serviceRef.current?.dispose();
     serviceRef.current = null;
     mnemonicRef.current = null;
+    probeDoneRef.current = false;
     setScan(null);
     setOnline(false);
     setScanning(false);
@@ -161,6 +163,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setError(friendly(e));
       }
       await doRescan();
+
+      // One-shot per unlock: re-discover funds sitting on receive addresses
+      // beyond the persisted receiveIndex (restored / reinstalled wallet).
+      if (!probeDoneRef.current) {
+        probeDoneRef.current = true;
+        try {
+          const active = await svc.probeForUsedAddresses(10);
+          if (active !== null && active > s.receiveIndex) {
+            const next = { ...s, receiveIndex: active };
+            setSettings(next);
+            await saveKey(SETTINGS_KEY, next);
+            svc.expandTo(active);
+            await doRescan();
+          }
+        } catch {
+          // Best-effort — the wallet keeps working with the known chain.
+        }
+      }
+
       svc.subscribe(() => {
         void doRescan();
       });

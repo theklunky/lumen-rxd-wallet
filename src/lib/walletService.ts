@@ -255,6 +255,41 @@ export class WalletService {
     return this.currentAddress;
   }
 
+  /** Re-derive the receive chain out to `newIndex` (inclusive). */
+  expandTo(newIndex: number): void {
+    this._addresses = this.hd.deriveRange(0, newIndex + 1);
+  }
+
+  /**
+   * Check the next `extra` receive indices (beyond the current chain) for
+   * existing activity (balance or history). Returns the highest active
+   * index, or null. Run once per unlock so a restored/reinstalled wallet
+   * re-discovers funds received on older receive addresses.
+   */
+  async probeForUsedAddresses(extra = 10): Promise<number | null> {
+    await this.client.connect();
+    const start = this._addresses.length; // = receiveIndex + 1
+    const candidates = this.hd.deriveRange(start, extra);
+    const found = await Promise.allSettled(
+      candidates.map(async (a) => {
+        const [bal, history] = await Promise.all([
+          this.client.getBalance(a.address),
+          this.client.getHistory(a.address),
+        ]);
+        const active =
+          bal.confirmed > 0n || bal.unconfirmed > 0n || history.length > 0;
+        return active ? a.index : null;
+      }),
+    );
+    let highest: number | null = null;
+    for (const r of found) {
+      if (r.status === "fulfilled" && r.value !== null) {
+        if (highest === null || r.value > highest) highest = r.value;
+      }
+    }
+    return highest;
+  }
+
   /** Raw approximate fee for a 1-input/2-output P2PKH tx at the network floor. */
   estimateStandardFee(inputs = 1): bigint {
     return estimateFee(inputs, 2, this.feeRate);
