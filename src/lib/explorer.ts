@@ -3,7 +3,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import type { NetworkName } from "@radiant-core/sdk";
 
 const EXPLORERS: Partial<Record<NetworkName, string>> = {
-  mainnet: "https://explorer.radiantblockchain.org",
+  mainnet: "https://rxdexplorer.com",
   testnet: "https://testnet.radiantexplorer.com",
 };
 

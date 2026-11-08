@@ -134,7 +134,7 @@ export function SettingsView() {
           <LinkChip href="https://radiantcore.org" label="radiantcore.org" />
           <LinkChip href="https://github.com/Radiant-Core" label="GitHub" />
           <LinkChip href="https://radiantcore.org/docs/sdk.html" label="SDK docs" />
-          <LinkChip href="https://explorer.radiantblockchain.org" label="Explorer" />
+          <LinkChip href="https://rxdexplorer.com" label="Explorer" />
         </div>
         <p className="mt-4 text-[11.5px] leading-relaxed text-faint">
           Your recovery phrase is encrypted with your password (PBKDF2 → AES-256-GCM) and
