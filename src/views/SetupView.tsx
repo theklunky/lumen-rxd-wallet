@@ -15,7 +15,11 @@ import {
   RadiantMark,
   ShieldIcon,
 } from "../components/ui";
-import { MIN_PASSWORD_LENGTH } from "../lib/crypto";
+import {
+  assessPassword,
+  MIN_PASSWORD_LENGTH,
+  RECOMMENDED_PASSWORD_LENGTH,
+} from "../lib/password";
 
 type Mode = "choose" | "create" | "restore";
 type Step = "phrase" | "password";
@@ -91,13 +95,14 @@ function PasswordStep({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const assessment = assessPassword(pw1);
+
   const submit = async () => {
     setError(null);
-    // Validate on submit so the requirement is spelled out when unmet.
-    if (pw1.length < MIN_PASSWORD_LENGTH) {
-      setError(
-        `Password must be at least ${MIN_PASSWORD_LENGTH} characters — yours is ${pw1.length}.`,
-      );
+    // Hard rules come from the policy module (length, blocklist, sequences);
+    // there are deliberately no composition rules.
+    if (!assessment.ok) {
+      setError(assessment.message ?? "Password rejected");
       return;
     }
     if (pw1 !== pw2) {
@@ -114,6 +119,10 @@ function PasswordStep({
     }
   };
 
+  const hardProblems = assessment.problems.filter(
+    (p) => !p.startsWith("Password must be at least"),
+  );
+
   return (
     <div className="space-y-4">
       <p className="text-[13px] text-muted">
@@ -127,9 +136,9 @@ function PasswordStep({
         autoFocus
         autoComplete="new-password"
         hint={
-          pw1.length >= MIN_PASSWORD_LENGTH
-            ? "✓ requirement met"
-            : `${pw1.length}/${MIN_PASSWORD_LENGTH}`
+          assessment.ok
+            ? "✓ meets requirements"
+            : `${assessment.length}/${MIN_PASSWORD_LENGTH}`
         }
       />
       <PasswordField
@@ -141,23 +150,39 @@ function PasswordStep({
       />
       <div className="rounded-lg border border-line bg-panel px-3 py-2">
         <p className="text-[12px] font-medium text-text">
-          Password requirements
+          Password requirements{" "}
+          <span className="font-normal text-faint">(NIST SP 800-63B)</span>
         </p>
         <ul className="mt-1 space-y-0.5 text-[12px] leading-relaxed text-muted">
           <li
             className={
-              pw1.length >= MIN_PASSWORD_LENGTH ? "text-good" : undefined
+              assessment.length >= MIN_PASSWORD_LENGTH ? "text-good" : undefined
             }
           >
             • At least {MIN_PASSWORD_LENGTH} characters
-            {pw1.length >= MIN_PASSWORD_LENGTH ? " ✓" : ` (${pw1.length} so far)`}
+            {assessment.length >= MIN_PASSWORD_LENGTH
+              ? " ✓"
+              : ` (${assessment.length} so far)`}
           </li>
-          <li>• Longer passphrases are stronger — a short sentence works well</li>
-          <li>
-            • There is no password reset: if you forget it, your 12-word
-            recovery phrase is the only way back in
-          </li>
+          {hardProblems.map((problem) => (
+            <li key={problem} className="text-bad">
+              • {problem}
+            </li>
+          ))}
+          <li>• No capitals, digits or symbols are required — length matters most</li>
+          <li>• Not a commonly used or previously breached password</li>
         </ul>
+        {assessment.suggestions.length > 0 && (
+          <ul className="mt-2 space-y-0.5 border-t border-line pt-2 text-[11.5px] leading-relaxed text-faint">
+            {assessment.suggestions.slice(0, 3).map((s) => (
+              <li key={s}>– {s}</li>
+            ))}
+            <li>
+              – Aim for {RECOMMENDED_PASSWORD_LENGTH}+ characters; there is no
+              reset, your 12-word phrase is the only backup
+            </li>
+          </ul>
+        )}
       </div>
       {error && <ErrorNote text={error} />}
       <div className="flex justify-between pt-1">

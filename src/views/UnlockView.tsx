@@ -1,5 +1,5 @@
 /** Password gate for an existing wallet. */
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useApp, friendly } from "../state/AppContext";
 import { Button, ErrorNote, Field, inputCls, RadiantMark, ShieldIcon } from "../components/ui";
 
@@ -10,14 +10,49 @@ export function UnlockView() {
   const [error, setError] = useState<string | null>(null);
   const [confirmErase, setConfirmErase] = useState(false);
 
+  // NIST SP 800-63B §5.1.1.2 — limit failed authentication attempts.
+  const [failures, setFailures] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState(0);
+  const [, forceTick] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!lockedUntil) return;
+    timerRef.current = setInterval(() => forceTick((t) => t + 1), 500);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = null;
+    };
+  }, [lockedUntil]);
+
+  const waitMs = Math.max(0, lockedUntil - Date.now());
+  const locked = waitMs > 0;
+  const waitSeconds = Math.ceil(waitMs / 1000);
+
+  const registerFailure = () => {
+    const next = failures + 1;
+    setFailures(next);
+    // First two attempts are free; afterwards back off 5s, 10s, 20s … (max 5 min).
+    if (next >= 3) {
+      const delaySeconds = Math.min(300, 5 * 2 ** (next - 3));
+      setLockedUntil(Date.now() + delaySeconds * 1000);
+    }
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (locked) return;
     setBusy(true);
     setError(null);
     try {
       await unlock(password);
+      setFailures(0);
     } catch (err) {
-      setError(friendly(err));
+      const message = friendly(err);
+      if (message.toLowerCase().includes("incorrect password")) {
+        registerFailure();
+      }
+      setError(message);
     } finally {
       setBusy(false);
     }
@@ -58,9 +93,14 @@ export function UnlockView() {
             />
           </Field>
           {error && <ErrorNote text={error} />}
-          <Button type="submit" busy={busy} disabled={!password} className="w-full">
+          {locked && (
+            <p className="text-center text-[12px] text-warn">
+              Too many failed attempts — try again in {waitSeconds}s.
+            </p>
+          )}
+          <Button type="submit" busy={busy} disabled={!password || locked} className="w-full">
             <ShieldIcon />
-            Unlock wallet
+            {locked ? `Locked — ${waitSeconds}s` : "Unlock wallet"}
           </Button>
         </form>
 

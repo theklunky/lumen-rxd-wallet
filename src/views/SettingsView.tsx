@@ -18,7 +18,7 @@ import {
   ExternalIcon,
 } from "../components/ui";
 import { openExternal } from "../lib/explorer";
-import { MIN_PASSWORD_LENGTH } from "../lib/crypto";
+import { assessPassword, MIN_PASSWORD_LENGTH } from "../lib/password";
 
 export function SettingsView() {
   const { settings, updateSettings } = useApp();
@@ -315,6 +315,7 @@ function ChangePwModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
+  const assessment = assessPassword(newPw);
 
   const go = async () => {
     setError(null);
@@ -322,10 +323,8 @@ function ChangePwModal({
       setError("Enter your current password.");
       return;
     }
-    if (newPw.length < MIN_PASSWORD_LENGTH) {
-      setError(
-        `New password must be at least ${MIN_PASSWORD_LENGTH} characters — yours is ${newPw.length}.`,
-      );
+    if (!assessment.ok) {
+      setError(assessment.message ?? "Password rejected");
       return;
     }
     if (newPw !== newPw2) {
@@ -366,9 +365,9 @@ function ChangePwModal({
             onChange={setNewPw}
             autoComplete="new-password"
             hint={
-              newPw.length >= MIN_PASSWORD_LENGTH
-                ? "✓ requirement met"
-                : `${newPw.length}/${MIN_PASSWORD_LENGTH}`
+              assessment.ok
+                ? "✓ meets requirements"
+                : `${assessment.length}/${MIN_PASSWORD_LENGTH}`
             }
           />
           <PasswordField
@@ -378,16 +377,28 @@ function ChangePwModal({
             autoComplete="new-password"
             hint={newPw2 && newPw !== newPw2 ? "does not match" : undefined}
           />
-          <p className="text-[12px] leading-relaxed text-muted">
-            New password must be at least {MIN_PASSWORD_LENGTH} characters
-            {newPw.length >= MIN_PASSWORD_LENGTH ? (
-              <span className="text-good"> ✓</span>
-            ) : (
-              ` (${newPw.length} so far)`
-            )}{" "}
-            — longer passphrases are stronger, and there is no reset if you
-            forget it.
-          </p>
+          <div className="rounded-lg border border-line bg-panel px-3 py-2 text-[12px] leading-relaxed">
+            <p className="text-muted">
+              At least {MIN_PASSWORD_LENGTH} characters — no capitals or
+              symbols required{" "}
+              <span className="text-faint">(NIST SP 800-63B)</span>
+              {assessment.length >= MIN_PASSWORD_LENGTH ? (
+                <span className="text-good"> ✓</span>
+              ) : (
+                ` (${assessment.length} so far)`
+              )}
+            </p>
+            {assessment.problems
+              .filter((p) => !p.startsWith("Password must be at least"))
+              .map((p) => (
+                <p key={p} className="text-bad">
+                  • {p}
+                </p>
+              ))}
+            {assessment.suggestions.length > 0 && (
+              <p className="text-faint">– {assessment.suggestions[0]}</p>
+            )}
+          </div>
           {error && <ErrorNote text={error} />}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose} disabled={busy}>

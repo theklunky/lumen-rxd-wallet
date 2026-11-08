@@ -1,11 +1,17 @@
 /**
  * Password-based vault encryption for the BIP-39 mnemonic.
  *
- * KDF:  PBKDF2-SHA-256, 310,000 iterations (OWASP 2023 recommendation).
+ * KDF:  PBKDF2-SHA-256, 600,000 iterations (OWASP 2023 guidance for
+ *       PBKDF2-HMAC-SHA256, and the work factor NIST SP 800-63B §5.1.1.2
+ *       expects to resist offline guessing). The iteration count is stored in
+ *       each vault, so vaults created with an older count keep working.
  * Cipher: AES-256-GCM (authenticated — a wrong password fails decryption).
  *
  * The mnemonic never touches disk in plaintext. Only the VaultBlob is stored.
  */
+import { MIN_PASSWORD_LENGTH, passwordLength } from "./password";
+
+export { MIN_PASSWORD_LENGTH };
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -50,15 +56,18 @@ export interface VaultPayload {
   coinType: number;
 }
 
-export const KDF_ITERATIONS = 310_000;
-export const MIN_PASSWORD_LENGTH = 10;
+export const KDF_ITERATIONS = 600_000;
 
-async function deriveKey(password: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
+async function deriveKey(
+  password: string,
+  salt: Uint8Array<ArrayBuffer>,
+  iterations: number,
+): Promise<CryptoKey> {
   const base = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, [
     "deriveKey",
   ]);
   return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations: KDF_ITERATIONS, hash: "SHA-256" },
+    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
     base,
     { name: "AES-GCM", length: 256 },
     false,
@@ -70,12 +79,12 @@ export async function encryptPayload(
   payload: VaultPayload,
   password: string,
 ): Promise<VaultBlob> {
-  if (password.length < MIN_PASSWORD_LENGTH) {
+  if (passwordLength(password) < MIN_PASSWORD_LENGTH) {
     throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
   }
   const salt = randomBytes(16);
   const iv = randomBytes(12);
-  const key = await deriveKey(password, salt);
+  const key = await deriveKey(password, salt, KDF_ITERATIONS);
   const plaintext = enc.encode(JSON.stringify(payload));
   const ct = new Uint8Array(
     await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext),
@@ -93,7 +102,8 @@ export async function decryptPayload(
   blob: VaultBlob,
   password: string,
 ): Promise<VaultPayload> {
-  const key = await deriveKey(password, hexToBytes(blob.salt));
+  const iterations = blob.iterations || KDF_ITERATIONS;
+  const key = await deriveKey(password, hexToBytes(blob.salt), iterations);
   let plaintext: ArrayBuffer;
   try {
     plaintext = await crypto.subtle.decrypt(

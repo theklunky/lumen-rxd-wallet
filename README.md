@@ -20,8 +20,11 @@ down with a strict CSP.
   wallets via coin type `0` is supported
 - Multiple receive addresses, with a dedicated **Addresses** tab listing every
   derived address, its balance, transaction count and derivation path
-- Password-protected vault: PBKDF2-SHA256 (310,000 iterations) → AES-256-GCM,
+- Password-protected vault: PBKDF2-SHA256 (600,000 iterations) → AES-256-GCM,
   stored locally; auto-lock after a configurable idle period
+- Password policy follows **NIST SP 800-63B**: ≥8 characters, no forced
+  character classes, blocked common/breached/pattern passwords, and
+  rate-limited unlock attempts — with a reveal toggle and guidance in the UI
 - Reveal recovery phrase (password-gated), change password, erase wallet
 
 **Sending & receiving**
@@ -183,7 +186,7 @@ Keys inside it:
 
 - `vault` — `{ v, salt, iterations, iv, ciphertext }`: the BIP-39 mnemonic and
   coin type, encrypted with a key derived from your password
-  (PBKDF2-SHA256, 310,000 iterations, AES-256-GCM with a random IV)
+  (PBKDF2-SHA256, 600,000 iterations, AES-256-GCM with a random IV)
 - `settings` — network, custom endpoint, current receive index, auto-lock
 
 Properties:
@@ -194,6 +197,24 @@ Properties:
   except the signed transaction when you broadcast.
 - Webview CSP: `default-src 'self'`, `script-src 'self'`, no remote code;
   network access limited to the ElectrumX/WAVE endpoints you configure.
+
+### Password policy (NIST SP 800-63B §5.1.1)
+
+Implemented in `src/lib/password.ts` and enforced in the context layer, so no
+UI path can bypass it:
+
+| NIST requirement | Implementation |
+|---|---|
+| ≥8 characters required | `MIN_PASSWORD_LENGTH = 8`; 12+ recommended in the UI |
+| Accept ≥64 characters, never truncate | up to 1024 characters, counted in code points (Unicode/emoji safe) |
+| No composition rules | none enforced — guidance only |
+| Blocklist of common/breached/expected secrets | ~90 entry local list + app/coin vocabulary, repeated characters, simple sequences & keyboard walks |
+| Offer guidance, allow paste | live checklist and suggestions; paste and password managers work normally |
+| Limit failed attempts (§5.1.1.2) | unlock backs off after 3 failures (5s, 10s, 20s … capped at 5 min) |
+| Adequate KDF work factor | PBKDF2-SHA256 @ 600,000 iterations, unique salt, AES-256-GCM |
+
+Vaults created by older builds keep working: each vault stores the iteration
+count it was encrypted with.
 
 ---
 

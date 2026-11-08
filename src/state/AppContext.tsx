@@ -16,12 +16,8 @@ import {
   type ReactNode,
 } from "react";
 import { HDWallet, type NetworkName } from "@radiant-core/sdk";
-import {
-  decryptPayload,
-  encryptPayload,
-  MIN_PASSWORD_LENGTH,
-  type VaultBlob,
-} from "../lib/crypto";
+import { decryptPayload, encryptPayload, type VaultBlob } from "../lib/crypto";
+import { assessPassword } from "../lib/password";
 import {
   loadVault,
   loadSettings,
@@ -193,9 +189,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ---- actions ------------------------------------------------------------
   const createWallet = useCallback(
     async (mnemonic: string, password: string, coinType: number) => {
-      if (password.length < MIN_PASSWORD_LENGTH) {
-        throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
-      }
+      // NIST SP 800-63B policy: length + blocklist, no composition rules.
+      const assessment = assessPassword(password);
+      if (!assessment.ok) throw new Error(assessment.message ?? "Password rejected");
       // Fail fast on an invalid phrase before touching storage.
       HDWallet.fromMnemonic(mnemonic, { coinType });
       const blob: VaultBlob = await encryptPayload({ mnemonic, coinType }, password);
@@ -264,8 +260,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const changePassword = useCallback(
     async (oldPassword: string, newPassword: string) => {
-      if (newPassword.length < MIN_PASSWORD_LENGTH) {
-        throw new Error(`New password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+      const assessment = assessPassword(newPassword);
+      if (!assessment.ok) {
+        throw new Error(assessment.message ?? "Password rejected");
       }
       const blob = await loadVault();
       if (!blob) throw new Error("No wallet found");
