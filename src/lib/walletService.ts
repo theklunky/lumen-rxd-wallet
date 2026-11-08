@@ -169,7 +169,7 @@ export class WalletService {
     let unconfirmed = 0n;
     const utxos: TaggedUtxo[] = [];
     const perAddress: Record<string, PerAddress> = {};
-    const txIds = new Map<string, number>(); // txid -> min height seen
+    const txMeta = new Map<string, { height: number; value: bigint }>(); // txid -> min height, net value
 
     for (const r of per) {
       if (r.status !== "fulfilled") continue;
@@ -177,20 +177,24 @@ export class WalletService {
       confirmed += bal.confirmed;
       unconfirmed += bal.unconfirmed;
       for (const u of us) utxos.push({ ...u, address: a.address });
-      const hs = history as { height: number; tx_hash: string }[];
+      const hs = history as { height: number; tx_hash: string; value?: number }[];
       perAddress[a.address] = {
         confirmed: bal.confirmed,
         unconfirmed: bal.unconfirmed,
         txCount: hs.length,
       };
       for (const h of hs) {
-        txIds.set(h.tx_hash, Math.min(txIds.get(h.tx_hash) ?? h.height, h.height));
+        const prev = txMeta.get(h.tx_hash);
+        txMeta.set(h.tx_hash, {
+          height: Math.min(prev?.height ?? h.height, h.height),
+          value: (prev?.value ?? 0n) + BigInt(h.value ?? 0),
+        });
       }
     }
 
     const historyItems: HistoryItem[] = [];
     const tokenCandidates = new Map<string, TokenHolding>();
-    await this.fetchTxDetails([...txIds.entries()], historyItems, tokenCandidates);
+    await this.fetchTxDetails([...txMeta.entries()], historyItems, tokenCandidates);
     const tokens = await this.filterLiveTokens(tokenCandidates);
 
     historyItems.sort((x, y) => y.time - x.time || y.height - x.height);
@@ -199,7 +203,7 @@ export class WalletService {
   }
 
   private async fetchTxDetails(
-    entries: [string, number][],
+    entries: [string, { height: number; value: bigint }][],
     items: HistoryItem[],
     tokenCandidates: Map<string, TokenHolding>,
   ): Promise<void> {
@@ -210,18 +214,43 @@ export class WalletService {
       { length: Math.min(FETCH_CONCURRENCY, queue.length) },
       async () => {
         while (queue.length > 0) {
-          const [txid, height] = queue.shift()!;
+          const [txid, meta] = queue.shift()!;
+          const synth = () => {
+            // ElectrumX returns null for mempool (unconfirmed) txs; a
+            // confirmed tx may also be momentarily unfetchable. Synthesize
+            // the row from the history entry so it is visible instead of
+            // silently dropped.
+            const v = meta.value;
+            items.push({
+              txid,
+              height: meta.height,
+              time: 0,
+              received: v > 0n ? v : 0n,
+              sent: v < 0n ? -v : 0n,
+              fee: 0n,
+              counterparty: null,
+            });
+          };
           try {
-            let tx = this.txCache.get(txid);
+            let tx: RawTx | null | undefined = this.txCache.get(txid);
             if (!tx) {
-              tx = (await this.client.getTransaction(txid, true)) as RawTx;
+              tx = (await this.client.getTransaction(txid, true)) as RawTx | null;
               if (tx) this.txCache.set(txid, tx);
             }
-            const item = this.analyzeTx(tx, txid, height, walletSet);
-            if (item) items.push(item);
-            this.extractTokens(tx, tokenCandidates, walletP2pkh);
+            if (tx) {
+              const item = this.analyzeTx(tx, txid, meta.height, walletSet);
+              if (item) items.push(item);
+              this.extractTokens(tx, tokenCandidates, walletP2pkh);
+            } else {
+              synth();
+            }
           } catch {
-            // A single unreadable tx must not fail the whole scan.
+            // Last resort: still surface the row from history metadata.
+            try {
+              synth();
+            } catch {
+              // Ignore — never fail the whole scan for one tx.
+            }
           }
         }
       },
