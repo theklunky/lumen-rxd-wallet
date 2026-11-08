@@ -112,6 +112,17 @@ interface RawTx {
   }[];
 }
 
+/**
+ * Radiant's ElectrumX server reports verbose-transaction values in decimal
+ * RXD (e.g. 1.0, 298067.9508) — NOT integer sats. Convert to sats safely
+ * (fractions would throw in BigInt; null/undefined in covenant prevouts
+ * must not crash the analysis).
+ */
+function rxdToSats(v: number | null | undefined): bigint {
+  if (typeof v !== "number" || !Number.isFinite(v)) return 0n;
+  return BigInt(Math.round(v * 1e8));
+}
+
 export class WalletService {
   readonly client: ElectrumClient;
   readonly hd: HDWallet;
@@ -341,7 +352,7 @@ export class WalletService {
     let counterparty: string | null = null;
 
     for (const i of tx.vin ?? []) {
-      const v = BigInt(i.prevout?.value ?? 0);
+      const v = rxdToSats(i.prevout?.value);
       totalIn += v;
       const addrs = i.prevout?.scriptPubKey?.addresses ?? [];
       if (addrs.some((a) => wallet.has(a))) {
@@ -350,7 +361,7 @@ export class WalletService {
       }
     }
     for (const o of tx.vout ?? []) {
-      const v = BigInt(o.value ?? 0);
+      const v = rxdToSats(o.value);
       totalOut += v;
       const addrs = o.scriptPubKey?.addresses ?? [];
       if (addrs.some((a) => wallet.has(a))) {
@@ -362,7 +373,7 @@ export class WalletService {
     if (received === 0n && sent === 0n) return null;
     const fee =
       typeof tx.fee === "number"
-        ? BigInt(Math.round(tx.fee))
+        ? rxdToSats(tx.fee)
         : totalIn > totalOut
           ? totalIn - totalOut
           : 0n;
@@ -402,7 +413,7 @@ export class WalletService {
       candidates.set(`${txid}:${i}`, {
         txid,
         vout: i,
-        value: BigInt(o.value ?? 0),
+        value: rxdToSats(o.value),
         script: hex,
         kind,
         refDisplay,

@@ -37,6 +37,8 @@ export function HistoryRow({ item, network }: { item: HistoryItem; network: Netw
   const delta = item.received - item.sent;
   const isIn = item.received > 0n && item.sent === 0n;
   const isOut = item.sent > 0n && item.received === 0n;
+  const isUnknown = !isIn && !isOut && item.received === 0n && item.sent === 0n;
+  const label = isIn ? "Received RXD" : isOut ? "Sent RXD" : isUnknown ? "Transaction" : "Internal transfer";
 
   return (
     <li className="flex items-center gap-3 px-4 py-3">
@@ -49,7 +51,7 @@ export function HistoryRow({ item, network }: { item: HistoryItem; network: Netw
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-[13.5px] font-medium">
-          {isIn ? "Received RXD" : isOut ? "Sent RXD" : "Internal transfer"}
+          {label}
           {item.height === 0 && (
             <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10.5px] font-semibold text-accent">
               unconfirmed
@@ -64,10 +66,10 @@ export function HistoryRow({ item, network }: { item: HistoryItem; network: Netw
       </div>
       <div className="shrink-0 text-right">
         <div
-          title={isIn || isOut ? undefined : "Amount moved between your own addresses"}
+          title={isIn || isOut ? undefined : isUnknown ? "Amount unavailable from server" : "Amount moved between your own addresses"}
           className={`text-[13.5px] font-semibold ${isIn ? "text-good" : "text-text"}`}
         >
-          {isIn || isOut ? fmtSignedRxd(delta) : fmtRxd(item.received)} RXD
+          {isUnknown ? "—" : isIn || isOut ? fmtSignedRxd(delta) : fmtRxd(item.received)} RXD
         </div>
         {item.fee > 0n && item.sent > 0n && (
           <div className="text-[11px] text-faint">incl. fee {fmtRxd(item.fee)} RXD</div>
