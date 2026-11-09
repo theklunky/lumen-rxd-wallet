@@ -1,4 +1,8 @@
-# Lumen RXD Wallet
+<p align="center">
+  <img src="src/assets/radiant-mark.png" alt="Radiant" width="112" height="112" />
+</p>
+
+<h1 align="center">Lumen RXD Wallet</h1>
 
 A non-custodial desktop wallet for the [Radiant](https://radiantcore.org) (RXD)
 blockchain, built with **Tauri 2 + React/TypeScript** on top of the official
