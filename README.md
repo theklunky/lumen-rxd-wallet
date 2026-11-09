@@ -57,6 +57,18 @@ down with a strict CSP.
 
 ---
 
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/fresh.png" alt="First launch: create a new wallet or restore from a recovery phrase" width="760" />
+</p>
+
+<p align="center">
+  <img src="screenshots/new_wallet.png" alt="Wallet overview: balance, receive address, send panel and recent activity" width="760" />
+</p>
+
+---
+
 ## Requirements
 
 | | |
