@@ -62,7 +62,7 @@ export function UnlockView() {
     setBusy(true);
     setError(null);
     try {
-      await erase(password);
+      await erase();
     } catch (err) {
       setError(friendly(err));
       setBusy(false);
@@ -115,12 +115,13 @@ export function UnlockView() {
           ) : (
             <div className="space-y-2">
               <p className="text-[12.5px] text-bad">
-                This deletes the encrypted wallet from this Mac. Without your
-                12-word recovery phrase the funds are unrecoverable.
+                Only do this if you have your 12-word recovery phrase saved.
+                This deletes the encrypted wallet from this Mac — without it,
+                the funds are unrecoverable.
               </p>
               <div className="flex justify-center gap-2">
                 <Button variant="danger" onClick={doErase} busy={busy} className="px-3 py-1.5 text-[12.5px]">
-                  Yes, erase (verifies password above)
+                  Yes, erase this wallet
                 </Button>
                 <Button variant="ghost" onClick={() => setConfirmErase(false)} className="px-3 py-1.5 text-[12.5px]">
                   Cancel

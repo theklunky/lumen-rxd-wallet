@@ -184,7 +184,7 @@ function SecuritySection() {
         />
         <SecurityRow
           title="Erase wallet"
-          body="Delete the encrypted vault from this Mac. Verifies your password first."
+          body="Delete the encrypted vault from this Mac. Only do this if you have your recovery phrase."
           action="Erase"
           danger
           onClick={() => setModal("erase")}
@@ -419,9 +419,8 @@ function EraseModal({
   onErase,
 }: {
   onClose: () => void;
-  onErase: (password: string) => Promise<void>;
+  onErase: () => Promise<void>;
 }) {
-  const [pw, setPw] = useState("");
   const [confirmText, setConfirmText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -430,7 +429,7 @@ function EraseModal({
     setBusy(true);
     setError(null);
     try {
-      await onErase(pw);
+      await onErase();
       // phase switches to "setup" on success
     } catch (e) {
       setError(friendly(e));
@@ -442,28 +441,19 @@ function EraseModal({
     <Modal title="Erase wallet" onClose={onClose}>
       <div className="space-y-4">
         <p className="text-[13px] leading-relaxed text-bad">
-          This permanently deletes the encrypted wallet from this Mac. You can restore it later
-          only with your 12-word recovery phrase.
+          Only do this if you have your 12-word recovery phrase saved. This
+          permanently deletes the encrypted wallet from this Mac — you can
+          restore it later only with that phrase.
         </p>
-        <Field label="Password">
-          <input
-            type="password"
-            className={inputCls}
-            value={pw}
-            onChange={(e) => setPw(e.target.value)}
-            autoFocus
-            autoComplete="off"
-          />
-        </Field>
         <Field label="Type ERASE to confirm">
-          <input className={inputCls} value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="ERASE" />
+          <input className={inputCls} value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="ERASE" autoFocus />
         </Field>
         {error && <ErrorNote text={error} />}
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
-          <Button variant="danger" onClick={go} busy={busy} disabled={!pw || confirmText !== "ERASE"}>
+          <Button variant="danger" onClick={go} busy={busy} disabled={confirmText !== "ERASE"}>
             Erase wallet
           </Button>
         </div>

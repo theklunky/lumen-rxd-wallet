@@ -52,7 +52,7 @@ interface AppApi {
   createWallet: (mnemonic: string, password: string, coinType: number) => Promise<void>;
   unlock: (password: string) => Promise<void>;
   lock: () => void;
-  erase: (password: string) => Promise<void>;
+  erase: () => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
   changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
 
@@ -220,11 +220,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [teardown]);
 
   const erase = useCallback(
-    async (password: string) => {
+    async () => {
       const blob = await loadVault();
       if (!blob) throw new Error("No wallet found");
-      // Verify the password before erasing anything.
-      await decryptPayload(blob, password);
+      // No password check: we're deleting the encrypted vault, not reading it.
+      // The caller must confirm the user holds the 12-word recovery phrase.
       teardown();
       await removeKey(VAULT_KEY);
       const s: Settings = {
