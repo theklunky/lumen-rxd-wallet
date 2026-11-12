@@ -284,6 +284,33 @@ Radiant's ecosystem has a few sharp edges that this wallet handles explicitly:
 | Icon looks stale in the Dock | macOS caches it — `killall Dock` |
 | `tauri build` fails at the DMG step | Terminal lacks Finder automation permission (Big Sur+); grant it in *Privacy & Security → Automation*, or use the produced `.app` |
 | Restored wallet shows a wrong/zero balance | Confirm the same network (mainnet/testnet) and that the seed matches; the unlock probe searches the next 10 addresses automatically |
+| macOS: "…app is damaged and can't be opened" | Gatekeeper, not corruption — the build is ad-hoc signed, not notarized. Strip the quarantine flag (note below) |
+
+### macOS: "app is damaged and can't be opened" (Gatekeeper)
+
+This is **not corruption** — it's macOS **Gatekeeper**. The release builds are
+**ad-hoc signed and not notarized** (the CI has no Apple Developer ID), so when
+you download the app macOS tags it `com.apple.quarantine` and, being unable to
+verify a trusted signature, reports it as "damaged."
+
+To open a downloaded build, clear the quarantine flag in **Terminal** (move the
+app to `/Applications` first, then):
+
+```sh
+sudo xattr -dr com.apple.quarantine "/Applications/Lumen RXD Wallet.app"
+```
+
+Launch it normally. If it still refuses, strip all flags and re-apply the ad-hoc
+signature:
+
+```sh
+sudo xattr -cr "/Applications/Lumen RXD Wallet.app"
+sudo codesign --force --deep -s - "/Applications/Lumen RXD Wallet.app"
+```
+
+You only need to do this **once per download**. The permanent fix is to sign
+with a **Developer ID** certificate and **notarize** in CI — see
+[Limitations](#limitations).
 
 ## Limitations
 
