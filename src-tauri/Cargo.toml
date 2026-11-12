@@ -1,6 +1,6 @@
 [package]
 name = "lumen-wallet"
-version = "0.1.0"
+version = "0.1.1"
 description = "Lumen RXD Wallet — non-custodial Radiant (RXD) wallet for macOS and Windows"
 authors = ["Lumen RXD Wallet"]
 license = "MIT"
