@@ -84,20 +84,20 @@ jobs:
       - name: Verify the .app was produced
         run: test -d "src-tauri/target/release/bundle/macos/Lumen RXD Wallet.app"
 
-      - name: Package .app (DMG is best-effort)
+      - name: Name the DMG (version + macOS)
         run: |
-          ditto -c -k --keepParent \
-            "src-tauri/target/release/bundle/macos/Lumen RXD Wallet.app" \
-            "Lumen-RXD-Wallet-macOS.app.zip"
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          mkdir -p macos
+          mv "src-tauri/target/release/bundle/dmg/"*.dmg "macos/Lumen RXD Wallet ${version} macOS.dmg"
+          ls -1 macos
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos
-          if-no-files-found: warn
+          if-no-files-found: error
           path: |
-            src-tauri/target/release/bundle/dmg/*.dmg
-            Lumen-RXD-Wallet-macOS.app.zip
+            macos/
 
   release:
     needs: [windows, macos]
@@ -120,5 +120,4 @@ jobs:
           draft: false
           files: |
             dist/**/*.dmg
-            dist/**/*.zip
             dist/**/*.exe
