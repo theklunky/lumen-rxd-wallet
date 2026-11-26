@@ -352,8 +352,14 @@ export class WalletService {
               const hex = po.script?.toHex?.() ?? "";
               const v = BigInt(po.satoshis ?? 0);
               totalIn += v;
-              if (hex && ourScripts.has(hex)) spent += v;
-              else allInputsOurs = false;
+              if (hex && ourScripts.has(hex)) {
+                spent += v;
+              } else {
+                allInputsOurs = false;
+                // For a receive the sender is an input's prevout — use it as the
+                // counterparty when no external output already set one.
+                if (!counterparty && hex) counterparty = this.scriptToAddress(hex);
+              }
             }
 
             if (received === 0n && spent === 0n) continue;
