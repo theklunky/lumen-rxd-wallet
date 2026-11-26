@@ -45,16 +45,14 @@ export interface HistoryItem {
   height: number;
   /** Unix seconds (block time or mempool time). */
   time: number;
-  /** Photons received from an external party; for internal moves, the amount moved. */
+  /** Photons received by the wallet in this tx (change included). */
   received: bigint;
-  /** Photons sent to an external party (0 for receives and internal moves). */
+  /** Photons spent from the wallet in this tx (inputs). */
   sent: bigint;
   /** Network fee, photons. */
   fee: bigint;
   /** First non-wallet address involved, if any. */
   counterparty: string | null;
-  /** True when the tx only moved funds between the wallet's own addresses. */
-  internal: boolean;
 }
 
 export interface TokenHolding {
@@ -253,7 +251,6 @@ export class WalletService {
               sent: meta.debit,
               fee: 0n,
               counterparty: null,
-              internal: false,
             });
           };
           try {
@@ -374,52 +371,39 @@ export class WalletService {
   estimateStandardFee(inputs = 1): bigint {
     return estimateFee(inputs, 2, this.feeRate);
   }
-  /** Compute the user-facing breakdown for one verbose transaction. */
+  /** Compute the wallet delta for one verbose transaction. */
   private analyzeTx(
     tx: RawTx,
     txid: string,
     height: number,
     wallet: Set<string>,
   ): HistoryItem | null {
-    let toWallet = 0n; // value of outputs paying a wallet address (incl. change)
-    let fromWallet = 0n; // value of inputs owned by the wallet
-    let toExternal = 0n; // value of outputs paying a non-wallet address
-    let fromExternal = 0n;
+    let received = 0n;
+    let sent = 0n;
+    let totalIn = 0n;
+    let totalOut = 0n;
     let counterparty: string | null = null;
 
     for (const i of tx.vin ?? []) {
       const v = rxdToSats(i.prevout?.value);
+      totalIn += v;
       const addrs = i.prevout?.scriptPubKey?.addresses ?? [];
       if (addrs.some((a) => wallet.has(a))) {
-        fromWallet += v;
-      } else {
-        fromExternal += v;
-        if (!counterparty) counterparty = addrs[0] ?? null;
+        sent += v;
+        if (!counterparty) counterparty = addrs.find((a) => !wallet.has(a)) ?? null;
       }
     }
     for (const o of tx.vout ?? []) {
       const v = rxdToSats(o.value);
+      totalOut += v;
       const addrs = o.scriptPubKey?.addresses ?? [];
       if (addrs.some((a) => wallet.has(a))) {
-        toWallet += v;
-      } else {
-        toExternal += v;
-        if (!counterparty) counterparty = addrs[0] ?? null;
+        received += v;
+        if (!counterparty) counterparty = addrs.find((a) => !wallet.has(a)) ?? null;
       }
     }
 
-    // Amounts are relative to the EXTERNAL counterparty, so change is never
-    // mistaken for money coming in: a pure receipt (the wallet spent nothing)
-    // counts everything that landed; otherwise the wallet's outputs are only
-    // change (received = 0); sent = value paid to the counterparty. A tx with no
-    // external party at all is an internal move between the wallet's addresses.
-    const internal = toExternal === 0n && fromExternal === 0n;
-    const received = internal ? toWallet : fromWallet === 0n ? toWallet : 0n;
-    const sent = toExternal;
-
-    if (!internal && received === 0n && sent === 0n) return null;
-    const totalIn = fromWallet + fromExternal;
-    const totalOut = toWallet + toExternal;
+    if (received === 0n && sent === 0n) return null;
     const fee =
       typeof tx.fee === "number"
         ? rxdToSats(tx.fee)
@@ -427,7 +411,7 @@ export class WalletService {
           ? totalIn - totalOut
           : 0n;
     const time = tx.block?.timestamp ?? tx.blocktime ?? tx.time ?? 0;
-    return { txid, height, time, received, sent, fee, counterparty, internal };
+    return { txid, height, time, received, sent, fee, counterparty };
   }
 
   /**
