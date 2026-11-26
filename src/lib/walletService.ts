@@ -127,6 +127,8 @@ export class WalletService {
   readonly client: ElectrumClient;
   readonly hd: HDWallet;
   readonly network: NetworkName;
+  private _external: DerivedKey[];
+  /** Combined external (change 0) + internal/change (change 1) keys, 0..receiveIndex. */
   private _addresses: DerivedKey[];
   private connectionListener: ((connected: boolean) => void) | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -142,7 +144,12 @@ export class WalletService {
     this.hd = hd;
     this.network = network;
     this.client = new ElectrumClient(endpoint ? { endpoint } : { network });
-    this._addresses = hd.deriveRange(0, receiveIndex + 1);
+    // Derive BOTH the external (receive, change=0) and internal (change, change=1)
+    // chains: a standard HD wallet puts change outputs on the internal chain, so
+    // those funds must be scanned, subscribed to, and spendable too.
+    const count = receiveIndex + 1;
+    this._external = hd.deriveRange(0, count, 0);
+    this._addresses = [...this._external, ...hd.deriveRange(0, count, 1)];
   }
 
   /** Derived receive chain, index 0..receiveIndex. */
@@ -150,9 +157,9 @@ export class WalletService {
     return this._addresses;
   }
 
-  /** The address currently shown for receiving (highest derived index). */
+  /** The address currently shown for receiving (highest external index). */
   get currentAddress(): DerivedKey {
-    return this._addresses[this._addresses.length - 1];
+    return this._external[this._external.length - 1];
   }
 
   /** Network fee floor (photons/byte). */
@@ -295,13 +302,17 @@ export class WalletService {
    * Callers persist the new receiveIndex and rescan.
    */
   advanceAddress(): DerivedKey {
-    this._addresses = this.hd.deriveRange(0, this._addresses.length + 1);
+    const count = this._external.length + 1;
+    this._external = this.hd.deriveRange(0, count, 0);
+    this._addresses = [...this._external, ...this.hd.deriveRange(0, count, 1)];
     return this.currentAddress;
   }
 
-  /** Re-derive the receive chain out to `newIndex` (inclusive). */
+  /** Re-derive both chains out to `newIndex` (inclusive). */
   expandTo(newIndex: number): void {
-    this._addresses = this.hd.deriveRange(0, newIndex + 1);
+    const count = newIndex + 1;
+    this._external = this.hd.deriveRange(0, count, 0);
+    this._addresses = [...this._external, ...this.hd.deriveRange(0, count, 1)];
   }
 
   /**
@@ -320,12 +331,16 @@ export class WalletService {
     maxAddresses = 200,
   ): Promise<number | null> {
     await this.client.connect();
-    const initialStart = this._addresses.length; // = receiveIndex + 1
+    const initialStart = this._external.length; // = receiveIndex + 1
     let start = initialStart;
     let highest: number | null = null;
     while (start - initialStart < maxAddresses) {
       const count = Math.min(gapLimit, maxAddresses - (start - initialStart));
-      const candidates = this.hd.deriveRange(start, count);
+      // Probe BOTH the external and internal/change chains for this window.
+      const candidates = [
+        ...this.hd.deriveRange(start, count, 0),
+        ...this.hd.deriveRange(start, count, 1),
+      ];
       const found = await Promise.allSettled(
         candidates.map(async (a) => {
           const [bal, history] = await Promise.all([

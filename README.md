@@ -20,8 +20,9 @@ down with a strict CSP.
 
 **Wallets**
 - Create a new wallet (fresh 12-word BIP-39 phrase) or restore from an existing one
-- Derivation `m/44'/512'/0'/0/x` (SLIP-0044 coin type 512); restoring legacy
-  wallets via coin type `0` is supported
+- Derivation `m/44'/512'/0'/{0,1}/x` (SLIP-0044 coin type 512) across both the
+  external (receive) and internal (change) chains; legacy coin type `0` restores
+  are supported
 - Multiple receive addresses, with a dedicated **Addresses** tab listing every
   derived address, its balance, transaction count and derivation path
 - Password-protected vault: PBKDF2-SHA256 (600,000 iterations) → AES-256-GCM,
@@ -269,9 +270,9 @@ Radiant's ecosystem has a few sharp edges that this wallet handles explicitly:
 - **Token UTXOs are keyed by `scriptHash(zeroRefs(script))`**, so Glyph
   balances are discovered from history outputs and verified live with a
   per-token `listUnspent` check; they are excluded from RXD funding.
-- **Restores probe extra addresses**: on unlock the wallet checks the next 10
-  receive indices and extends the scan chain if it finds activity — a restore
-  can never hide funds sitting on a previously used address.
+- **Restores probe extra addresses**: on unlock the wallet runs a gap-limit
+  discovery scan across the receive and change chains and extends them if it
+  finds activity — a restore can never hide funds on a previously used address.
 - **The fee is measured, not estimated**: the transaction is serialized with
   its real signatures, then the fee is set to `(size + 20) × feeRate`, with a
   sanity ceiling that refuses obviously wrong fees.

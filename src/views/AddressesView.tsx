@@ -38,7 +38,8 @@ export function AddressesView() {
         {addresses.map((a) => {
           const stats = scan.perAddress[a.address];
           const balance = (stats?.confirmed ?? 0n) + (stats?.unconfirmed ?? 0n);
-          const isCurrent = a.index === settings.receiveIndex;
+          const isChange = a.change === 1;
+          const isCurrent = a.index === settings.receiveIndex && !isChange;
           return (
             <li key={a.address} className="flex items-center gap-3 px-4 py-3">
               <span
@@ -54,6 +55,11 @@ export function AddressesView() {
                   {isCurrent && (
                     <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[10.5px] font-semibold text-accent">
                       current
+                    </span>
+                  )}
+                  {isChange && (
+                    <span className="shrink-0 rounded-full bg-card2 px-2 py-0.5 text-[10.5px] font-semibold text-muted">
+                      change
                     </span>
                   )}
                 </div>

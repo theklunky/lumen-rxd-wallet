@@ -47,7 +47,7 @@ interface AppApi {
   /** The receive address currently on display (null while locked). */
   currentAddress: { address: string; path: string; index: number } | null;
   /** All derived receive addresses, index 0..receiveIndex. */
-  addresses: { address: string; path: string; index: number }[] | null;
+  addresses: { address: string; path: string; index: number; change: number }[] | null;
 
   createWallet: (mnemonic: string, password: string, coinType: number) => Promise<void>;
   unlock: (password: string) => Promise<void>;
@@ -344,10 +344,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       clearError,
       currentAddress: serviceRef.current?.currentAddress ?? null,
       addresses:
-        serviceRef.current?.addresses.map(({ index, path, address }) => ({
+        serviceRef.current?.addresses.map(({ index, path, address, change }) => ({
           index,
           path,
           address,
+          change,
         })) ?? null,
       createWallet,
       unlock,
