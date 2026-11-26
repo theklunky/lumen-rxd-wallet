@@ -70,6 +70,19 @@ async function inspect(client, txid) {
   console.log(
     `  => app shows: ${toE > 0n ? `SENT ${rxd(toE)}` : `RECEIVED/INTERNAL ${rxd(toW)}`}${cp ? `  (to ${cp})` : ""}`,
   );
+  // Verify the getHistory-based signed net (what scan() aggregates per tx).
+  let histNet = 0n;
+  for (const addr of wallet) {
+    try {
+      const hist = await client.getHistory(addr);
+      for (const row of hist) if (row.tx_hash === txid) histNet += BigInt(row.value ?? 0);
+    } catch {
+      /* ignore */
+    }
+  }
+  console.log(
+    `  => history-net: ${rxd(histNet)} RXD  (${histNet > 0n ? "RECEIVED" : histNet < 0n ? "SENT" : "SELF"})`,
+  );
 }
 
 async function main() {

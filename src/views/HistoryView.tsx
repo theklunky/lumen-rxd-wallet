@@ -2,13 +2,14 @@
 import type { NetworkName } from "@radiant-core/sdk";
 import { useApp } from "../state/AppContext";
 import type { HistoryItem } from "../lib/walletService";
-import { fmtRxd, fmtSignedRxd, fmtTime, truncateMiddle } from "../lib/format";
+import { fmtRxd, fmtTime, truncateMiddle } from "../lib/format";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
   CopyButton,
   EmptyState,
   ExternalIcon,
+  RefreshIcon,
 } from "../components/ui";
 import { openExternal, explorerTxUrl } from "../lib/explorer";
 
@@ -34,20 +35,30 @@ export function HistoryView() {
 }
 
 export function HistoryRow({ item, network }: { item: HistoryItem; network: NetworkName }) {
-  const delta = item.received - item.sent;
-  const isIn = item.received > 0n && item.sent === 0n;
-  const isOut = item.sent > 0n && item.received === 0n;
-  const isUnknown = !isIn && !isOut && item.received === 0n && item.sent === 0n;
-  const label = isIn ? "Received RXD" : isOut ? "Sent RXD" : isUnknown ? "Transaction" : "Internal transfer";
+  const incoming = item.direction === "received";
+  const outgoing = item.direction === "sent";
+  const amount = item.net < 0n ? -item.net : item.net;
+  const label = incoming ? "Received RXD" : outgoing ? "Sent RXD" : "Self transfer";
+  const sign = incoming ? "+" : outgoing ? "−" : "";
 
   return (
     <li className="flex items-center gap-3 px-4 py-3">
       <span
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-          isIn ? "bg-good/12 text-good" : "bg-card2 text-muted"
+          incoming
+            ? "bg-good/12 text-good"
+            : outgoing
+              ? "bg-accent/15 text-accent"
+              : "bg-card2 text-muted"
         }`}
       >
-        {isIn ? <ArrowDownIcon size={16} /> : <ArrowUpIcon size={16} />}
+        {incoming ? (
+          <ArrowDownIcon size={16} />
+        ) : outgoing ? (
+          <ArrowUpIcon size={16} />
+        ) : (
+          <RefreshIcon size={16} />
+        )}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-[13.5px] font-medium">
@@ -66,14 +77,13 @@ export function HistoryRow({ item, network }: { item: HistoryItem; network: Netw
       </div>
       <div className="shrink-0 text-right">
         <div
-          title={isIn || isOut ? undefined : isUnknown ? "Amount unavailable from server" : "Amount moved between your own addresses"}
-          className={`text-[13.5px] font-semibold ${isIn ? "text-good" : "text-text"}`}
+          className={`text-[13.5px] font-semibold ${
+            incoming ? "text-good" : outgoing ? "text-accent" : "text-muted"
+          }`}
         >
-          {isUnknown ? "—" : isIn || isOut ? fmtSignedRxd(delta) : fmtRxd(item.received)} RXD
+          {sign}
+          {fmtRxd(amount)} RXD
         </div>
-        {item.fee > 0n && item.sent > 0n && (
-          <div className="text-[11px] text-faint">incl. fee {fmtRxd(item.fee)} RXD</div>
-        )}
       </div>
       <div className="flex shrink-0 items-center gap-0.5 pl-1">
         <CopyButton text={item.txid} />

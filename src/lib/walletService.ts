@@ -27,6 +27,7 @@ import {
   scriptHash,
   zeroRefs,
   unpackRef,
+  radiantjs,
   estimateFee,
   MIN_RELAY_FEE_RATE,
   type DerivedKey,
@@ -43,15 +44,15 @@ export interface HistoryItem {
   txid: string;
   /** Block height; 0 = unconfirmed (mempool). */
   height: number;
-  /** Unix seconds (block time or mempool time). */
+  /** Unix seconds, or 0 when unknown (mempool). */
   time: number;
-  /** Photons received by the wallet in this tx (change included). */
-  received: bigint;
-  /** Photons spent from the wallet in this tx (inputs). */
-  sent: bigint;
-  /** Network fee, photons. */
-  fee: bigint;
-  /** First non-wallet address involved, if any. */
+  /** Which way the funds moved, from the signed net effect. */
+  direction: "received" | "sent" | "self";
+  /** Signed net effect on the wallet in photons (negative = sent). Includes fee. */
+  net: bigint;
+  /** Network fee in photons, when all inputs are ours and known. */
+  fee?: bigint;
+  /** First external address involved, if any. */
   counterparty: string | null;
 }
 
@@ -89,38 +90,22 @@ export interface ScanResult {
 
 const FETCH_CONCURRENCY = 8;
 const RESCAN_DEBOUNCE_MS = 2000;
+/** BIP44 gap limit — stop discovering after this many consecutive unused addresses. */
+const GAP_LIMIT = 20;
+/** Hard cap so a pathological chain can never scan forever. */
+const HARD_ADDRESS_CAP = 400;
+/** Cap how many transactions we describe in detail (mempool spam can be huge). */
+const HISTORY_LIMIT = 200;
 
-/** Verbose ElectrumX transaction shape (bitcoind-style getrawtransaction). */
-interface RawTx {
-  txid?: string;
-  hash?: string;
-  time?: number;
-  blocktime?: number;
-  blockhash?: string;
-  confirmations?: number;
-  fee?: number;
-  block?: { height: number; timestamp?: number };
-  vin?: {
-    prevout?: {
-      value?: number;
-      scriptPubKey?: { hex?: string; addresses?: string[] };
-    };
-  }[];
-  vout?: {
-    value?: number;
-    scriptPubKey?: { hex?: string; addresses?: string[] };
-  }[];
-}
-
-/**
- * Radiant's ElectrumX server reports verbose-transaction values in decimal
- * RXD (e.g. 1.0, 298067.9508) — NOT integer sats. Convert to sats safely
- * (fractions would throw in BigInt; null/undefined in covenant prevouts
- * must not crash the analysis).
- */
-function rxdToSats(v: number | null | undefined): bigint {
-  if (typeof v !== "number" || !Number.isFinite(v)) return 0n;
-  return BigInt(Math.round(v * 1e8));
+/** Read the block timestamp (unix seconds) out of an 80-byte header hex string. */
+function headerTime(headerHex: string): number | undefined {
+  if (!headerHex || headerHex.length < 144) return undefined;
+  const offset = 68 * 2; // the time field starts at byte 68
+  const slice = headerHex.slice(offset, offset + 8);
+  if (!/^[0-9a-fA-F]{8}$/.test(slice)) return undefined;
+  const le = slice.match(/../g)!.reverse().join("");
+  const seconds = parseInt(le, 16);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
 }
 
 export class WalletService {
@@ -133,7 +118,10 @@ export class WalletService {
   private connectionListener: ((connected: boolean) => void) | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private rescanTimer: ReturnType<typeof setTimeout> | null = null;
-  private txCache = new Map<string, RawTx>();
+  private parsedCache = new Map<string, unknown>(); // txid -> radiantjs.Transaction | null
+  private headerTimeCache = new Map<number, number | undefined>();
+  /** Addresses found by the gap-limit walk (both chains); used to classify txs. */
+  private _discovered: DerivedKey[] = [];
 
   constructor(
     hd: HDWallet,
@@ -175,6 +163,14 @@ export class WalletService {
   async scan(): Promise<ScanResult> {
     await this.client.connect();
 
+    // 1) Gap-limit discovery across BOTH chains, driven by history (so spent
+    //    but previously used addresses are recognised). This is what lets us
+    //    tell "a send from our own inputs" apart from "a receive" — mirroring
+    //    the iOS app's scanChain/loadHistory.
+    this._discovered = await this.discoverAddresses();
+    const ourScripts = new Set(this._discovered.map((k) => p2pkhScript(k.address)));
+
+    // 2) Balances + UTXOs + per-address activity over the displayed/spendable set.
     const per = await Promise.allSettled(
       this._addresses.map(async (a) => {
         const [bal, utxos, history] = await Promise.all([
@@ -190,7 +186,7 @@ export class WalletService {
     let unconfirmed = 0n;
     const utxos: TaggedUtxo[] = [];
     const perAddress: Record<string, PerAddress> = {};
-    const txMeta = new Map<string, { height: number; credit: bigint; debit: bigint }>(); // txid -> min height, wallet credits/debits
+    const heights = new Map<string, number>(); // txid -> best (highest) height
 
     for (const r of per) {
       if (r.status !== "fulfilled") continue;
@@ -198,86 +194,194 @@ export class WalletService {
       confirmed += bal.confirmed;
       unconfirmed += bal.unconfirmed;
       for (const u of us) utxos.push({ ...u, address: a.address });
-      const hs = history as { height: number; tx_hash: string; value?: number }[];
+      const hs = history as { height: number; tx_hash: string }[];
       perAddress[a.address] = {
         confirmed: bal.confirmed,
         unconfirmed: bal.unconfirmed,
         txCount: hs.length,
       };
       for (const h of hs) {
-        const prev = txMeta.get(h.tx_hash);
-        const v = BigInt(h.value ?? 0);
-        txMeta.set(h.tx_hash, {
-          height: Math.min(prev?.height ?? h.height, h.height),
-          credit: (prev?.credit ?? 0n) + (v > 0n ? v : 0n),
-          debit: (prev?.debit ?? 0n) + (v < 0n ? -v : 0n),
-        });
+        const prev = heights.get(h.tx_hash);
+        if (prev === undefined || h.height > prev) heights.set(h.tx_hash, h.height);
       }
     }
 
-    const historyItems: HistoryItem[] = [];
+    // 3) History from raw hex + prevout resolution (correct signed net, fee
+    //    included) and token discovery from the same parsed outputs.
     const tokenCandidates = new Map<string, TokenHolding>();
-    await this.fetchTxDetails([...txMeta.entries()], historyItems, tokenCandidates);
+    const historyItems = await this.buildHistory(heights, ourScripts, tokenCandidates);
     const tokens = await this.filterLiveTokens(tokenCandidates);
 
     historyItems.sort((x, y) => y.time - x.time || y.height - x.height);
-
     return { confirmed, unconfirmed, utxos, history: historyItems, tokens, perAddress };
   }
 
-  private async fetchTxDetails(
-    entries: [string, { height: number; credit: bigint; debit: bigint }][],
-    items: HistoryItem[],
+  /**
+   * Walk one BIP44 chain in batches of GAP_LIMIT, using address *history* (not
+   * balance) to decide "used", until GAP_LIMIT consecutive unused addresses are
+   * seen. Includes spent-but-used addresses so their inputs are recognised.
+   */
+  private async discoverAddresses(): Promise<DerivedKey[]> {
+    const out: DerivedKey[] = [];
+    for (const change of [0, 1]) {
+      let start = 0;
+      let lastUsed = -1;
+      while (start < HARD_ADDRESS_CAP) {
+        const batch = this.hd.deriveRange(start, GAP_LIMIT, change);
+        const histories = await Promise.allSettled(
+          batch.map((k) => this.client.getHistory(k.address)),
+        );
+        batch.forEach((key, i) => {
+          const r = histories[i];
+          const used = r.status === "fulfilled" && (r.value as unknown[]).length > 0;
+          if (used) {
+            out.push(key);
+            if (key.index > lastUsed) lastUsed = key.index;
+          }
+        });
+        start += GAP_LIMIT;
+        if (lastUsed < 0) break;
+        if (start - lastUsed > GAP_LIMIT) break;
+      }
+    }
+    const seen = new Set(out.map((k) => k.address));
+    for (const k of this._addresses) {
+      if (!seen.has(k.address)) {
+        out.push(k);
+        seen.add(k.address);
+      }
+    }
+    return out;
+  }
+
+  /** Fetch + parse a raw transaction hex, cached. */
+  private async parseTx(txid: string): Promise<any | null> {
+    if (this.parsedCache.has(txid)) return this.parsedCache.get(txid);
+    try {
+      const hex = await this.client.getTransaction(txid);
+      if (typeof hex !== "string") {
+        this.parsedCache.set(txid, null);
+        return null;
+      }
+      const parsed = new radiantjs.Transaction(hex);
+      this.parsedCache.set(txid, parsed);
+      return parsed;
+    } catch {
+      this.parsedCache.set(txid, null);
+      return null;
+    }
+  }
+
+  /** Block timestamp for a height (0 = mempool → unknown). */
+  private async resolveTime(height: number): Promise<number | undefined> {
+    if (height <= 0) return undefined;
+    if (this.headerTimeCache.has(height)) return this.headerTimeCache.get(height);
+    let t: number | undefined;
+    try {
+      const headerHex = await this.client.request<string>("blockchain.block.header", height);
+      t = headerTime(headerHex);
+    } catch {
+      t = undefined;
+    }
+    this.headerTimeCache.set(height, t);
+    return t;
+  }
+
+  /** Decode a P2PKH output script to an address, or null for non-standard scripts. */
+  private scriptToAddress(hex: string): string | null {
+    try {
+      return radiantjs.Address.fromScript(new radiantjs.Script(hex), this.network).toString();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Build history via raw tx hex + prevout resolution (as the iOS app does):
+   * received = value of our outputs, spent = value of our inputs (each input's
+   * prevout value is read from the previous transaction). net = received − spent,
+   * direction is its sign, and the amount includes the fee because net does.
+   */
+  private async buildHistory(
+    heights: Map<string, number>,
+    ourScripts: Set<string>,
     tokenCandidates: Map<string, TokenHolding>,
-  ): Promise<void> {
-    const walletSet = new Set(this._addresses.map((a) => a.address));
-    const walletP2pkh = this._addresses.map((a) => p2pkhScript(a.address));
-    const queue = [...entries];
+  ): Promise<HistoryItem[]> {
+    const items: HistoryItem[] = [];
+    const queue = [...heights.entries()]
+      .sort((a, b) => (a[1] === 0 ? -1 : b[1] === 0 ? 1 : b[1] - a[1])) // mempool first, then newest
+      .slice(0, HISTORY_LIMIT);
     const workers = Array.from(
       { length: Math.min(FETCH_CONCURRENCY, queue.length) },
       async () => {
         while (queue.length > 0) {
-          const [txid, meta] = queue.shift()!;
-          const synth = () => {
-            // ElectrumX returns null for mempool (unconfirmed) txs; a
-            // confirmed tx may also be momentarily unfetchable. Synthesize
-            // the row from the history entry so it is visible instead of
-            // silently dropped.
-            items.push({
-              txid,
-              height: meta.height,
-              time: 0,
-              received: meta.debit > 0n ? 0n : meta.credit,
-              sent: meta.debit > meta.credit ? meta.debit - meta.credit : 0n,
-              fee: 0n,
-              counterparty: null,
-            });
-          };
+          const [txid, height] = queue.shift()!;
           try {
-            let tx: RawTx | null | undefined = this.txCache.get(txid);
-            if (!tx) {
-              tx = (await this.client.getTransaction(txid, true)) as RawTx | null;
-              if (tx) this.txCache.set(txid, tx);
+            const tx = await this.parseTx(txid);
+            if (!tx) continue;
+
+            let received = 0n;
+            let counterparty: string | null = null;
+            for (const o of tx.outputs) {
+              const hex = o.script?.toHex?.() ?? "";
+              if (hex && ourScripts.has(hex)) received += BigInt(o.satoshis ?? 0);
+              else if (hex && !counterparty) counterparty = this.scriptToAddress(hex);
             }
-            if (tx) {
-              const item = this.analyzeTx(tx, txid, meta.height, walletSet, meta.debit);
-              if (item) items.push(item);
-              this.extractTokens(tx, tokenCandidates, walletP2pkh);
-            } else {
-              synth();
+
+            let spent = 0n;
+            let totalIn = 0n;
+            let allInputsOurs = true;
+            const anyInput = tx.inputs.length > 0;
+            for (const input of tx.inputs) {
+              if (input.isNull?.()) {
+                allInputsOurs = false;
+                continue;
+              }
+              const prevTxid =
+                typeof input.prevTxId === "string"
+                  ? input.prevTxId
+                  : Array.from(input.prevTxId as Uint8Array)
+                      .map((b) => b.toString(16).padStart(2, "0"))
+                      .join("");
+              const prev = await this.parseTx(prevTxid);
+              const po = prev?.outputs?.[input.outputIndex];
+              if (!po) {
+                allInputsOurs = false;
+                continue;
+              }
+              const hex = po.script?.toHex?.() ?? "";
+              const v = BigInt(po.satoshis ?? 0);
+              totalIn += v;
+              if (hex && ourScripts.has(hex)) spent += v;
+              else allInputsOurs = false;
             }
+
+            if (received === 0n && spent === 0n) continue;
+            const net = received - spent;
+            const direction: HistoryItem["direction"] =
+              net > 0n ? "received" : net < 0n ? "sent" : "self";
+
+            let fee: bigint | undefined;
+            if (anyInput && allInputsOurs && direction === "sent") {
+              const totalOut = tx.outputs.reduce(
+                (s: bigint, o: any) => s + BigInt(o.satoshis ?? 0),
+                0n,
+              );
+              const computed = totalIn - totalOut;
+              if (computed > 0n) fee = computed;
+            }
+
+            const time = (await this.resolveTime(height)) ?? 0;
+            items.push({ txid, height, time, direction, net, fee, counterparty });
+            this.extractTokensFromParsed(tx, txid, height, tokenCandidates);
           } catch {
-            // Last resort: still surface the row from history metadata.
-            try {
-              synth();
-            } catch {
-              // Ignore — never fail the whole scan for one tx.
-            }
+            // Never fail the whole scan for one tx.
           }
         }
       },
     );
     await Promise.all(workers);
+    return items;
   }
 
   get connected(): boolean {
@@ -371,78 +475,19 @@ export class WalletService {
   estimateStandardFee(inputs = 1): bigint {
     return estimateFee(inputs, 2, this.feeRate);
   }
+
   /**
-   * Compute the user-facing breakdown for one transaction.
-   *
-   * Direction comes from the OUTPUTS plus the wallet's net `debit` from the
-   * address history — never from input prevouts. ElectrumX frequently omits
-   * `vin[].prevout` details, and deriving "sent" from them made a send (pay an
-   * external party, return change to the wallet) look like a large receive.
+   * Discover token outputs from a parsed raw transaction: FT/NFT covenant
+   * scripts whose owner P2PKH is one of our discovered addresses.
    */
-  private analyzeTx(
-    tx: RawTx,
+  private extractTokensFromParsed(
+    tx: any,
     txid: string,
     height: number,
-    wallet: Set<string>,
-    debit: bigint,
-  ): HistoryItem | null {
-    let toWallet = 0n; // outputs paying one of our addresses (change included)
-    let toExternal = 0n; // outputs paying anyone else = what we actually sent
-    let counterparty: string | null = null;
-
-    for (const o of tx.vout ?? []) {
-      const v = rxdToSats(o.value);
-      const addrs = o.scriptPubKey?.addresses ?? [];
-      if (addrs.some((a) => wallet.has(a))) {
-        toWallet += v;
-      } else {
-        toExternal += v;
-        if (!counterparty) counterparty = addrs[0] ?? null;
-      }
-    }
-
-    let received: bigint;
-    let sent: bigint;
-    if (toExternal > 0n) {
-      // We paid an external party → a send; our own change is not "received".
-      received = 0n;
-      sent = toExternal;
-    } else if (debit > 0n) {
-      // No external output but the wallet spent → funds moved between our own
-      // addresses (received > 0 and sent > 0 → rendered as an internal transfer).
-      received = toWallet;
-      sent = debit;
-    } else {
-      // Pure receipt.
-      received = toWallet;
-      sent = 0n;
-    }
-
-    if (received === 0n && sent === 0n) return null;
-    const fee =
-      typeof tx.fee === "number"
-        ? rxdToSats(tx.fee)
-        : debit > toWallet + toExternal
-          ? debit - toWallet - toExternal
-          : 0n;
-    const time = tx.block?.timestamp ?? tx.blocktime ?? tx.time ?? 0;
-    return { txid, height, time, received, sent, fee, counterparty };
-  }
-
-  /**
-   * Discover token outputs minted/transferred to this wallet by scanning the
-   * verbose history outputs for FT/NFT covenant scripts whose owner P2PKH is
-   * one of our addresses.
-   */
-  private extractTokens(
-    tx: RawTx,
     candidates: Map<string, TokenHolding>,
-    walletP2pkh: string[],
   ): void {
-    const txid = tx.txid ?? tx.hash ?? "";
-    const height = tx.block?.height ?? 0;
-    (tx.vout ?? []).forEach((o, i) => {
-      const hex = o.scriptPubKey?.hex ?? "";
+    (tx.outputs ?? []).forEach((o: any, i: number) => {
+      const hex = o.script?.toHex?.() ?? "";
       if (!hex || !isTokenBearing(hex)) return;
       const kind = tokenScriptKind(hex);
       if (!kind) return;
@@ -450,8 +495,8 @@ export class WalletService {
       const ownerHash = parsed?.addressHash;
       if (!ownerHash) return;
       const ownerP2pkh = `76a914${ownerHash}88ac`;
-      const idx = walletP2pkh.findIndex((s) => s === ownerP2pkh);
-      if (idx < 0) return;
+      const ownerKey = this._discovered.find((k) => p2pkhScript(k.address) === ownerP2pkh);
+      if (!ownerKey) return;
       const ref = parsed.ref ?? "";
       let refDisplay = `${txid}:${i}`;
       if (ref) {
@@ -461,11 +506,11 @@ export class WalletService {
       candidates.set(`${txid}:${i}`, {
         txid,
         vout: i,
-        value: rxdToSats(o.value),
+        value: BigInt(o.satoshis ?? 0),
         script: hex,
         kind,
         refDisplay,
-        ownerAddress: this._addresses[idx].address,
+        ownerAddress: ownerKey.address,
         mintedConfirmed: height > 0,
       });
     });
@@ -594,7 +639,8 @@ export class WalletService {
     this.pollTimer = null;
     if (this.rescanTimer) clearTimeout(this.rescanTimer);
     this.rescanTimer = null;
-    this.txCache.clear();
+    this.parsedCache.clear();
+    this.headerTimeCache.clear();
     this.client.close();
   }
 }
