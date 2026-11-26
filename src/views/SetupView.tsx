@@ -4,6 +4,7 @@
  */
 import { useMemo, useState } from "react";
 import { HDWallet, RADIANT_COIN_TYPE } from "@radiant-core/sdk";
+import { detectCoinType } from "../lib/coinTypes";
 import { useApp, friendly } from "../state/AppContext";
 import {
   Button,
@@ -23,6 +24,7 @@ import {
 
 type Mode = "choose" | "create" | "restore";
 type Step = "phrase" | "password";
+type CoinMode = "auto" | 512 | 0 | 1;
 
 export function SetupView() {
   const [mode, setMode] = useState<Mode>("choose");
@@ -269,36 +271,85 @@ function CreateFlow({ onBack }: { onBack: () => void }) {
 
 function RestoreFlow({ onBack }: { onBack: () => void }) {
   const [phrase, setPhrase] = useState("");
-  const [legacy, setLegacy] = useState(false);
+  const [coinMode, setCoinMode] = useState<CoinMode>("auto");
+  const [detecting, setDetecting] = useState(false);
+  const [detected, setDetected] = useState<number | null>(null);
   const [step, setStep] = useState<Step>("phrase");
   const [error, setError] = useState<string | null>(null);
 
-  const coinType = legacy ? 0 : RADIANT_COIN_TYPE;
   const normalized = phrase.trim().toLowerCase().replace(/\s+/g, " ");
+  const manualCoinType = coinMode === "auto" ? RADIANT_COIN_TYPE : coinMode;
+  const effectiveCoinType =
+    coinMode === "auto" ? (detected ?? RADIANT_COIN_TYPE) : coinMode;
 
   const valid = useMemo(() => {
     if (normalized.split(" ").length < 12) return false;
     try {
-      HDWallet.fromMnemonic(normalized, { coinType });
+      HDWallet.fromMnemonic(normalized, { coinType: manualCoinType });
       return true;
     } catch {
       return false;
     }
-  }, [normalized, coinType]);
+  }, [normalized, manualCoinType]);
+
+  const chooseMode = (m: CoinMode) => {
+    setCoinMode(m);
+    setDetected(null);
+    setError(null);
+  };
+
+  const onContinue = async () => {
+    setError(null);
+    if (coinMode !== "auto") {
+      setStep("password");
+      return;
+    }
+    setDetecting(true);
+    try {
+      const res = await detectCoinType(normalized);
+      setDetected(res.coinType);
+      setStep("password");
+    } catch (e) {
+      setError(friendly(e));
+    } finally {
+      setDetecting(false);
+    }
+  };
 
   if (step === "password") {
     return (
       <div className="rounded-2xl border border-line bg-card p-6">
         <h2 className="mb-4 text-[15px] font-semibold">Set a password</h2>
+        {detected !== null && (
+          <p className="mb-3 text-[12px] text-muted">
+            Restoring with coin type {detected} —{" "}
+            <span className="font-mono">m/44′/{detected}′/0′/…</span>
+          </p>
+        )}
         <PasswordStep
           mnemonic={normalized}
-          coinType={coinType}
+          coinType={effectiveCoinType}
           onBack={() => setStep("phrase")}
           onDone={() => undefined}
         />
       </div>
     );
   }
+
+  const options: { value: CoinMode; title: string; sub: string }[] = [
+    {
+      value: "auto",
+      title: "Auto-detect (recommended)",
+      sub: "Checks coin types 512, 1 and 0 and picks the one with activity",
+    },
+    { value: 512, title: "Radiant — coin type 512", sub: "m/44′/512′/0′/… (standard path)" },
+    {
+      value: 1,
+      title: "Legacy — coin type 1",
+      sub: "m/44′/1′/0′/… (older wallets, e.g. the original electron)",
+    },
+    { value: 0, title: "Legacy — coin type 0", sub: "m/44′/0′/0′/… (BTC-style)" },
+  ];
 
   return (
     <div className="space-y-4">
@@ -316,30 +367,46 @@ function RestoreFlow({ onBack }: { onBack: () => void }) {
         />
         {normalized.length > 0 && !valid && (
           <p className="mt-2 text-[12.5px] text-bad">
-            That doesn't look like a valid 12-word BIP-39 phrase
-            {legacy ? "" : " for the standard Radiant path"}.
+            That doesn't look like a valid 12-word BIP-39 phrase.
           </p>
         )}
       </div>
-      <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-line bg-card p-4">
-        <input
-          type="checkbox"
-          checked={legacy}
-          onChange={(e) => setLegacy(e.target.checked)}
-          className="mt-0.5 h-4 w-4 accent-accent"
-        />
-        <span className="text-[12.5px] text-muted">
-          <span className="text-text">Legacy wallet (coin type 0)</span> — only
-          for wallets created before the Radiant coin-type-512 default
-          (m/44′/0′/0′/0/k).
-        </span>
-      </label>
+
+      <div className="rounded-2xl border border-line bg-card p-4">
+        <div className="mb-2 text-[13px] font-medium">Derivation</div>
+        <div className="space-y-1.5">
+          {options.map((o) => (
+            <label
+              key={String(o.value)}
+              className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 ${
+                coinMode === o.value ? "border-accent/50 bg-card2" : "border-line"
+              }`}
+            >
+              <input
+                type="radio"
+                name="coinmode"
+                checked={coinMode === o.value}
+                onChange={() => chooseMode(o.value)}
+                className="mt-0.5 h-4 w-4 accent-accent"
+              />
+              <span className="min-w-0">
+                <span className="block text-[12.5px] text-text">{o.title}</span>
+                <span className="block text-[11.5px] text-faint">{o.sub}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        {coinMode === "auto" && detected !== null && (
+          <p className="mt-2 text-[12px] text-good">Detected coin type {detected}.</p>
+        )}
+      </div>
+
       {error && <ErrorNote text={error} />}
       <div className="flex justify-between">
         <Button variant="ghost" onClick={onBack}>
           Back
         </Button>
-        <Button disabled={!valid} onClick={() => setStep("password")}>
+        <Button disabled={!valid} busy={detecting} onClick={() => void onContinue()}>
           Continue
         </Button>
       </div>
