@@ -247,8 +247,8 @@ export class WalletService {
               txid,
               height: meta.height,
               time: 0,
-              received: meta.credit,
-              sent: meta.debit,
+              received: meta.debit > 0n ? 0n : meta.credit,
+              sent: meta.debit > meta.credit ? meta.debit - meta.credit : 0n,
               fee: 0n,
               counterparty: null,
             });
@@ -260,7 +260,7 @@ export class WalletService {
               if (tx) this.txCache.set(txid, tx);
             }
             if (tx) {
-              const item = this.analyzeTx(tx, txid, meta.height, walletSet);
+              const item = this.analyzeTx(tx, txid, meta.height, walletSet, meta.debit);
               if (item) items.push(item);
               this.extractTokens(tx, tokenCandidates, walletP2pkh);
             } else {
@@ -371,44 +371,59 @@ export class WalletService {
   estimateStandardFee(inputs = 1): bigint {
     return estimateFee(inputs, 2, this.feeRate);
   }
-  /** Compute the wallet delta for one verbose transaction. */
+  /**
+   * Compute the user-facing breakdown for one transaction.
+   *
+   * Direction comes from the OUTPUTS plus the wallet's net `debit` from the
+   * address history — never from input prevouts. ElectrumX frequently omits
+   * `vin[].prevout` details, and deriving "sent" from them made a send (pay an
+   * external party, return change to the wallet) look like a large receive.
+   */
   private analyzeTx(
     tx: RawTx,
     txid: string,
     height: number,
     wallet: Set<string>,
+    debit: bigint,
   ): HistoryItem | null {
-    let received = 0n;
-    let sent = 0n;
-    let totalIn = 0n;
-    let totalOut = 0n;
+    let toWallet = 0n; // outputs paying one of our addresses (change included)
+    let toExternal = 0n; // outputs paying anyone else = what we actually sent
     let counterparty: string | null = null;
 
-    for (const i of tx.vin ?? []) {
-      const v = rxdToSats(i.prevout?.value);
-      totalIn += v;
-      const addrs = i.prevout?.scriptPubKey?.addresses ?? [];
-      if (addrs.some((a) => wallet.has(a))) {
-        sent += v;
-        if (!counterparty) counterparty = addrs.find((a) => !wallet.has(a)) ?? null;
-      }
-    }
     for (const o of tx.vout ?? []) {
       const v = rxdToSats(o.value);
-      totalOut += v;
       const addrs = o.scriptPubKey?.addresses ?? [];
       if (addrs.some((a) => wallet.has(a))) {
-        received += v;
-        if (!counterparty) counterparty = addrs.find((a) => !wallet.has(a)) ?? null;
+        toWallet += v;
+      } else {
+        toExternal += v;
+        if (!counterparty) counterparty = addrs[0] ?? null;
       }
+    }
+
+    let received: bigint;
+    let sent: bigint;
+    if (toExternal > 0n) {
+      // We paid an external party → a send; our own change is not "received".
+      received = 0n;
+      sent = toExternal;
+    } else if (debit > 0n) {
+      // No external output but the wallet spent → funds moved between our own
+      // addresses (received > 0 and sent > 0 → rendered as an internal transfer).
+      received = toWallet;
+      sent = debit;
+    } else {
+      // Pure receipt.
+      received = toWallet;
+      sent = 0n;
     }
 
     if (received === 0n && sent === 0n) return null;
     const fee =
       typeof tx.fee === "number"
         ? rxdToSats(tx.fee)
-        : totalIn > totalOut
-          ? totalIn - totalOut
+        : debit > toWallet + toExternal
+          ? debit - toWallet - toExternal
           : 0n;
     const time = tx.block?.timestamp ?? tx.blocktime ?? tx.time ?? 0;
     return { txid, height, time, received, sent, fee, counterparty };
