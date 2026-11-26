@@ -9,6 +9,7 @@ import {
   CopyButton,
   EmptyState,
   ExternalIcon,
+  RefreshIcon,
 } from "../components/ui";
 import { openExternal, explorerTxUrl } from "../lib/explorer";
 
@@ -35,10 +36,17 @@ export function HistoryView() {
 
 export function HistoryRow({ item, network }: { item: HistoryItem; network: NetworkName }) {
   const delta = item.received - item.sent;
-  const isIn = item.received > 0n && item.sent === 0n;
-  const isOut = item.sent > 0n && item.received === 0n;
-  const isUnknown = !isIn && !isOut && item.received === 0n && item.sent === 0n;
-  const label = isIn ? "Received RXD" : isOut ? "Sent RXD" : isUnknown ? "Transaction" : "Internal transfer";
+  const isInternal = item.internal;
+  const isIn = !isInternal && item.received > 0n;
+  const isOut = !isInternal && item.sent > 0n;
+  const isUnknown = !isIn && !isOut && !isInternal && item.received === 0n && item.sent === 0n;
+  const label = isIn
+    ? "Received RXD"
+    : isOut
+      ? "Sent RXD"
+      : isInternal
+        ? "Internal transfer"
+        : "Transaction";
 
   return (
     <li className="flex items-center gap-3 px-4 py-3">
@@ -47,7 +55,7 @@ export function HistoryRow({ item, network }: { item: HistoryItem; network: Netw
           isIn ? "bg-good/12 text-good" : "bg-card2 text-muted"
         }`}
       >
-        {isIn ? <ArrowDownIcon size={16} /> : <ArrowUpIcon size={16} />}
+        {isIn ? <ArrowDownIcon size={16} /> : isInternal ? <RefreshIcon size={16} /> : <ArrowUpIcon size={16} />}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-[13.5px] font-medium">
@@ -62,12 +70,21 @@ export function HistoryRow({ item, network }: { item: HistoryItem; network: Netw
           {fmtTime(item.time)}
           {item.height > 0 && <span> · block {item.height.toLocaleString()}</span>}
           {item.counterparty && <span> · {truncateMiddle(item.counterparty, 8, 6)}</span>}
+          {isInternal && <span> · between your own addresses</span>}
         </div>
       </div>
       <div className="shrink-0 text-right">
         <div
-          title={isIn || isOut ? undefined : isUnknown ? "Amount unavailable from server" : "Amount moved between your own addresses"}
-          className={`text-[13.5px] font-semibold ${isIn ? "text-good" : "text-text"}`}
+          title={
+            isUnknown
+              ? "Amount unavailable from server"
+              : isInternal
+                ? "Moved between your own addresses — not a payment to or from an external party"
+                : undefined
+          }
+          className={`text-[13.5px] font-semibold ${
+            isIn ? "text-good" : isInternal ? "text-muted" : "text-text"
+          }`}
         >
           {isUnknown ? "—" : isIn || isOut ? fmtSignedRxd(delta) : fmtRxd(item.received)} RXD
         </div>
