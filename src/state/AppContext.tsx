@@ -162,12 +162,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       await doRescan();
 
-      // One-shot per unlock: re-discover funds sitting on receive addresses
-      // beyond the persisted receiveIndex (restored / reinstalled wallet).
+      // One-shot per unlock: re-discover funds on receive addresses beyond the
+      // persisted receiveIndex (restored / reinstalled wallet) via a gap-limit
+      // scan, so funds on higher addresses are found even across unused gaps.
       if (!probeDoneRef.current) {
         probeDoneRef.current = true;
         try {
-          const active = await svc.probeForUsedAddresses(10);
+          const active = await svc.probeForUsedAddresses(20, 200);
           if (active !== null && active > s.receiveIndex) {
             const next = { ...s, receiveIndex: active };
             setSettings(next);

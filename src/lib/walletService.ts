@@ -305,31 +305,49 @@ export class WalletService {
   }
 
   /**
-   * Check the next `extra` receive indices (beyond the current chain) for
-   * existing activity (balance or history). Returns the highest active
-   * index, or null. Run once per unlock so a restored/reinstalled wallet
-   * re-discovers funds received on older receive addresses.
+   * Scan the receive chain beyond the current end for existing activity,
+   * bridging gaps up to `gapLimit` consecutive unused addresses (the standard
+   * BIP-44 gap-limit rule). Returns the highest active index found, or null.
+   * Bounded by `maxAddresses` total so the one-shot unlock scan stays snappy.
+   *
+   * A restored/reinstalled wallet resets its receiveIndex, so funds sent to
+   * higher receive addresses in a previous install would otherwise be
+   * invisible; this re-discovers them (and, unlike a fixed N-index probe,
+   * finds addresses sitting in unused gaps).
    */
-  async probeForUsedAddresses(extra = 10): Promise<number | null> {
+  async probeForUsedAddresses(
+    gapLimit = 20,
+    maxAddresses = 200,
+  ): Promise<number | null> {
     await this.client.connect();
-    const start = this._addresses.length; // = receiveIndex + 1
-    const candidates = this.hd.deriveRange(start, extra);
-    const found = await Promise.allSettled(
-      candidates.map(async (a) => {
-        const [bal, history] = await Promise.all([
-          this.client.getBalance(a.address),
-          this.client.getHistory(a.address),
-        ]);
-        const active =
-          bal.confirmed > 0n || bal.unconfirmed > 0n || history.length > 0;
-        return active ? a.index : null;
-      }),
-    );
+    const initialStart = this._addresses.length; // = receiveIndex + 1
+    let start = initialStart;
     let highest: number | null = null;
-    for (const r of found) {
-      if (r.status === "fulfilled" && r.value !== null) {
-        if (highest === null || r.value > highest) highest = r.value;
+    while (start - initialStart < maxAddresses) {
+      const count = Math.min(gapLimit, maxAddresses - (start - initialStart));
+      const candidates = this.hd.deriveRange(start, count);
+      const found = await Promise.allSettled(
+        candidates.map(async (a) => {
+          const [bal, history] = await Promise.all([
+            this.client.getBalance(a.address),
+            this.client.getHistory(a.address),
+          ]);
+          const active =
+            bal.confirmed > 0n || bal.unconfirmed > 0n || history.length > 0;
+          return active ? a.index : null;
+        }),
+      );
+      let activeInWindow: number | null = null;
+      for (const r of found) {
+        if (r.status === "fulfilled" && r.value !== null) {
+          if (activeInWindow === null || r.value > activeInWindow) {
+            activeInWindow = r.value;
+          }
+        }
       }
+      if (activeInWindow === null) break; // full empty window = gap limit reached
+      if (highest === null || activeInWindow > highest) highest = activeInWindow;
+      start = activeInWindow + 1; // continue just past the newest active address
     }
     return highest;
   }

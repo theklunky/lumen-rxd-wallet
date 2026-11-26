@@ -156,8 +156,10 @@ and the in-app `src/assets/radiant-mark.png`.
 1. Password → PBKDF2 → AES-GCM decrypt → mnemonic (memory only).
 2. `HDWallet.fromMnemonic` derives addresses `0..receiveIndex`.
 3. First scan fetches balance, UTXOs and history per address (8-way
-   concurrency), then a one-shot probe of the next 10 indices re-discovers
-   funds received on older addresses (e.g. after a restore).
+   concurrency). A one-shot, gap-limit discovery scan then re-discovers funds
+   on receive addresses beyond `receiveIndex` (e.g. after a restore): it probes
+   forward in windows of 20 until 20 consecutive addresses come back empty
+   (capped at 200 addresses total).
 4. ElectrumX subscriptions trigger debounced rescans, so incoming payments
    appear without manual refresh.
 
