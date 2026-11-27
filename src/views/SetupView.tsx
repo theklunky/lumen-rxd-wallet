@@ -24,7 +24,7 @@ import {
 
 type Mode = "choose" | "create" | "restore";
 type Step = "phrase" | "password";
-type CoinMode = "auto" | 512 | 0 | 1;
+type CoinMode = "auto" | 512 | 0;
 
 export function SetupView() {
   const [mode, setMode] = useState<Mode>("choose");
@@ -340,14 +340,9 @@ function RestoreFlow({ onBack }: { onBack: () => void }) {
     {
       value: "auto",
       title: "Auto-detect (recommended)",
-      sub: "Checks coin types 512, 1 and 0 and picks the one with activity",
+      sub: "Checks coin types 512 and 0 and picks the one with activity",
     },
     { value: 512, title: "Radiant — coin type 512", sub: "m/44′/512′/0′/… (standard path)" },
-    {
-      value: 1,
-      title: "Legacy — coin type 1",
-      sub: "m/44′/1′/0′/… (older wallets, e.g. the original electron)",
-    },
     { value: 0, title: "Legacy — coin type 0", sub: "m/44′/0′/0′/… (BTC-style)" },
   ];
 

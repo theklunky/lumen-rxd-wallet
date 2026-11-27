@@ -46,17 +46,15 @@ const toRxd = (photons) =>
 
 // Every plausible derivation path, most-likely first.
 const CHAINS = [
-  { coinType: 512, account: 0, change: 0, label: "Radiant(512) · external" },
-  { coinType: 512, account: 0, change: 1, label: "Radiant(512) · change" },
-  { coinType: 512, account: 1, change: 0, label: "Radiant(512) · external acct1" },
-  { coinType: 512, account: 1, change: 1, label: "Radiant(512) · change acct1" },
-  { coinType: 1, account: 0, change: 0, label: "Legacy(1) · external" },
-  { coinType: 1, account: 0, change: 1, label: "Legacy(1) · change" },
-  { coinType: 0, account: 0, change: 0, label: "Legacy(0) · external" },
-  { coinType: 0, account: 0, change: 1, label: "Legacy(0) · change" },
+  { coinType: 512, account: 0, change: 0, label: "Radiant · external(receive)" },
+  { coinType: 512, account: 0, change: 1, label: "Radiant · internal(change)" },
+  { coinType: 512, account: 1, change: 0, label: "Radiant · external acct1" },
+  { coinType: 512, account: 1, change: 1, label: "Radiant · internal acct1" },
+  { coinType: 0, account: 0, change: 0, label: "Legacy  · external(receive)" },
+  { coinType: 0, account: 0, change: 1, label: "Legacy  · internal(change)" },
 ];
 // Secondary paths use a smaller range to keep the scan bounded.
-const depthFor = (c) => (c.account > 0 || c.coinType !== 512 ? Math.min(depth, 50) : depth);
+const depthFor = (c) => (c.account > 0 || c.coinType === 0 ? Math.min(depth, 50) : depth);
 
 async function main() {
   const text = await readPhrase();

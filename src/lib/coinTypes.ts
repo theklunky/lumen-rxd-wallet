@@ -11,7 +11,7 @@ import {
 } from "@radiant-core/sdk";
 
 /** Coin types we can restore, most-likely first (used for tie-breaking). */
-export const CANDIDATE_COIN_TYPES = [RADIANT_COIN_TYPE, 1, 0] as const;
+export const CANDIDATE_COIN_TYPES = [RADIANT_COIN_TYPE, 0] as const;
 
 export interface CoinTypeDetection {
   /** Best coin type; falls back to 512 when nothing is found. */
